@@ -1,3 +1,5 @@
+github.com/aws-controllers-k8s/kms-controller v1.0.9 h1:GZHSnuZBoWp9r6RaJ3siyDn5BRhDuaZJXtdBKeAiLSw=
+github.com/aws-controllers-k8s/kms-controller v1.0.9/go.mod h1:Pnz0d5sly7dUgmYMDJWSRIKASOujJFi/b8N2q1qCLqU=
 github.com/aws-controllers-k8s/runtime v0.29.2 h1:t6wwoKqFmtbblMcwFivpWp1FZa0gkczoUsk+maIsiRA=
 github.com/aws-controllers-k8s/runtime v0.29.2/go.mod h1:mZa9l+/l+tlbxWVmMWWbUC3oAHUbeTzlI7xTOMdYHpA=
 github.com/aws/aws-sdk-go v1.49.24 h1:2ekq9ZvaoB2aRbTDfARzgVGUBB9N8XD2QYhFmTBlp+c=

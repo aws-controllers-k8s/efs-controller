@@ -1,8 +1,91 @@
 ignore:
   resource_names:
       - AccessPoint
-      - FileSystem
+      # FileSystem
       - MountTarget
       - ReplicationConfiguration
+  field_paths:
+  - CreateFileSystemInput.CreationToken
+  - FileSystemDescription.CreationToken
+  - PutBackupPolicyInput.FileSystemId
+  - PutLifecycleConfigurationInput.FileSystemId
+  - PutFileSystemPolicyInput.FileSystemId
+  - UpdateFileSystemProtectionInput.FileSystemId
 model_name: elasticfilesystem
 controller_name: efs
+resources:
+  FileSystem:
+    fields:
+      KMSKeyID:
+        references:
+          resource: Key
+          path: Status.ACKResourceMetadata.ARN
+          service_name: kms
+      FileSystemProtection:
+        is_read_only: false
+        from:
+          operation: UpdateFileSystemProtection
+          path: .
+      BackupPolicy:
+        from:
+          operation: PutBackupPolicy
+          path: BackupPolicy
+      Policy:
+        from:
+          operation: PutFileSystemPolicy
+          path: Policy
+      LifecyclePolicies:
+        from:
+          operation: PutLifecycleConfiguration
+          path: LifecyclePolicies
+    hooks:
+      delta_pre_compare:
+        code: customPreCompare(delta, a, b)
+      sdk_update_post_request:
+        code: return desired, nil
+      sdk_create_post_set_output:
+        template_path: hooks/file_system/sdk_create_post_set_output.go.tpl
+      sdk_read_many_post_set_output:
+        template_path: hooks/file_system/sdk_read_many_post_set_output.go.tpl
+      sdk_update_pre_build_request:
+        template_path: hooks/file_system/sdk_update_pre_build_request.go.tpl
+    print:
+      add_age_column: true
+      add_synced_column: true
+      order_by: index
+      additional_columns:
+      - name: ID
+        json_path: .status.fileSystemID
+        type: string
+        index: 10
+      - name: ENCRYPTED
+        json_path: .status.encrypted
+        type: boolean
+        index: 11
+      - name: PERFORMANCEMODE
+        json_path: .status.performanceMode
+        type: string
+        index: 15
+        priority: 1
+      - name: THROUGHPUTMODE
+        json_path: .status.throughputMode
+        type: string
+        index: 16
+        priority: 1
+      - name: PROVISIONEDTHROUGHPUT
+        json_path: .status.provisionedThroughputInMiBps
+        type: string
+        index: 17
+        priority: 1
+      - name: SIZE
+        json_path: .status.sizeInBytes.value
+        type: integer
+        index: 20
+      - name: MOUNTTARGETS
+        json_path: .status.numberOfMountTargets
+        type: integer
+        index: 25
+      - name: STATE
+        json_path: .status.lifeCycleState
+        type: string
+        index: 30
