@@ -11,7 +11,7 @@
 # express or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-"""Integration tests for the EFS layer version API.
+"""Integration tests for the EFS FileSystem API.
 """
 
 import pytest

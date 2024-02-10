@@ -10,6 +10,7 @@ rules:
   - efs.services.k8s.aws
   resources:
   - filesystems
+  - mounttargets
   verbs:
   - get
   - list

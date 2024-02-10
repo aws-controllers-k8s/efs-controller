@@ -30,6 +30,7 @@ var (
 
 // Provides a description of an EFS file system access point.
 type AccessPointDescription struct {
+	AccessPointID  *string `json:"accessPointID,omitempty"`
 	FileSystemID   *string `json:"fileSystemID,omitempty"`
 	LifeCycleState *string `json:"lifeCycleState,omitempty"`
 	OwnerID        *string `json:"ownerID,omitempty"`
@@ -121,6 +122,20 @@ type LifecyclePolicy struct {
 	TransitionToArchive             *string `json:"transitionToArchive,omitempty"`
 	TransitionToIA                  *string `json:"transitionToIA,omitempty"`
 	TransitionToPrimaryStorageClass *string `json:"transitionToPrimaryStorageClass,omitempty"`
+}
+
+// Provides a description of a mount target.
+type MountTargetDescription struct {
+	AvailabilityZoneID   *string `json:"availabilityZoneID,omitempty"`
+	AvailabilityZoneName *string `json:"availabilityZoneName,omitempty"`
+	FileSystemID         *string `json:"fileSystemID,omitempty"`
+	IPAddress            *string `json:"ipAddress,omitempty"`
+	LifeCycleState       *string `json:"lifeCycleState,omitempty"`
+	MountTargetID        *string `json:"mountTargetID,omitempty"`
+	NetworkInterfaceID   *string `json:"networkInterfaceID,omitempty"`
+	OwnerID              *string `json:"ownerID,omitempty"`
+	SubnetID             *string `json:"subnetID,omitempty"`
+	VPCID                *string `json:"vpcID,omitempty"`
 }
 
 // Describes the replication configuration for a specific file system.

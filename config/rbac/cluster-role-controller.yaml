@@ -31,6 +31,34 @@ rules:
   - patch
   - watch
 - apiGroups:
+  - ec2.services.k8s.aws
+  resources:
+  - securitygroups
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ec2.services.k8s.aws
+  resources:
+  - securitygroups/status
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ec2.services.k8s.aws
+  resources:
+  - subnets
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ec2.services.k8s.aws
+  resources:
+  - subnets/status
+  verbs:
+  - get
+  - list
+- apiGroups:
   - efs.services.k8s.aws
   resources:
   - filesystems
@@ -46,6 +74,26 @@ rules:
   - efs.services.k8s.aws
   resources:
   - filesystems/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - efs.services.k8s.aws
+  resources:
+  - mounttargets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - efs.services.k8s.aws
+  resources:
+  - mounttargets/status
   verbs:
   - get
   - patch
