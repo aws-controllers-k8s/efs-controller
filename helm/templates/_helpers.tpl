@@ -77,6 +77,40 @@ rules:
   - patch
   - watch
 - apiGroups:
+  - efs.services.k8s.aws
+  resources:
+  - filesystems
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - efs.services.k8s.aws
+  resources:
+  - filesystems/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kms.services.k8s.aws
+  resources:
+  - keys
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - kms.services.k8s.aws
+  resources:
+  - keys/status
+  verbs:
+  - get
+  - list
+- apiGroups:
   - services.k8s.aws
   resources:
   - adoptedresources

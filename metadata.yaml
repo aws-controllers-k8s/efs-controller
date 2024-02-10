@@ -1,8 +1,8 @@
 service:
-  full_name:
-  short_name:
-  link:
-  documentation:
+  full_name: Amazon Elastic File System
+  short_name: EFS
+  link: https://aws.amazon.com/efs/
+  documentation: https://docs.aws.amazon.com/efs/
 api_versions:
   - api_version: v1alpha1
     status: available
