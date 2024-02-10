@@ -15,6 +15,7 @@
 import logging
 
 from acktest.bootstrapping import Resources, BootstrapFailureException
+from acktest.bootstrapping.vpc import VPC
 
 from e2e import bootstrap_directory
 from e2e.bootstrap_resources import BootstrapResources
@@ -23,8 +24,12 @@ def service_bootstrap() -> Resources:
     logging.getLogger().setLevel(logging.INFO)
 
     resources = BootstrapResources(
-        # TODO: Add bootstrapping when you have defined the resources
+        EFSVPC=VPC(
+            name_prefix="efs-vpc", num_public_subnet=0, num_private_subnet=1,
+            private_subnet_cidr_blocks = ["10.0.0.0/20"]
+        )
     )
+
 
     try:
         resources.bootstrap()

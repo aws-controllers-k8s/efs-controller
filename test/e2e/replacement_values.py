@@ -14,5 +14,9 @@
 EFS-specific test variables.
 """
 
+from e2e.bootstrap_resources import get_bootstrap_resources
+
+
 REPLACEMENT_VALUES = {
+    "PRIVATE_SUBNET": get_bootstrap_resources().EFSVPC.private_subnets.subnet_ids[0],
 }

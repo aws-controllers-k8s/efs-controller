@@ -201,9 +201,9 @@ type FileSystemStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="ID",type=string,priority=0,JSONPath=`.status.fileSystemID`
-// +kubebuilder:printcolumn:name="ENCRYPTED",type=boolean,priority=0,JSONPath=`.status.encrypted`
-// +kubebuilder:printcolumn:name="PERFORMANCEMODE",type=string,priority=1,JSONPath=`.status.performanceMode`
-// +kubebuilder:printcolumn:name="THROUGHPUTMODE",type=string,priority=1,JSONPath=`.status.throughputMode`
+// +kubebuilder:printcolumn:name="ENCRYPTED",type=boolean,priority=0,JSONPath=`.spec.encrypted`
+// +kubebuilder:printcolumn:name="PERFORMANCEMODE",type=string,priority=1,JSONPath=`.spec.performanceMode`
+// +kubebuilder:printcolumn:name="THROUGHPUTMODE",type=string,priority=1,JSONPath=`.spec.throughputMode`
 // +kubebuilder:printcolumn:name="PROVISIONEDTHROUGHPUT",type=string,priority=1,JSONPath=`.status.provisionedThroughputInMiBps`
 // +kubebuilder:printcolumn:name="SIZE",type=integer,priority=0,JSONPath=`.status.sizeInBytes.value`
 // +kubebuilder:printcolumn:name="MOUNTTARGETS",type=integer,priority=0,JSONPath=`.status.numberOfMountTargets`

@@ -2,7 +2,7 @@ ignore:
   resource_names:
       - AccessPoint
       # FileSystem
-      - MountTarget
+      # MountTarget
       - ReplicationConfiguration
   field_paths:
   - CreateFileSystemInput.CreationToken
@@ -59,16 +59,16 @@ resources:
         type: string
         index: 10
       - name: ENCRYPTED
-        json_path: .status.encrypted
+        json_path: .spec.encrypted
         type: boolean
         index: 11
       - name: PERFORMANCEMODE
-        json_path: .status.performanceMode
+        json_path: .spec.performanceMode
         type: string
         index: 15
         priority: 1
       - name: THROUGHPUTMODE
-        json_path: .status.throughputMode
+        json_path: .spec.throughputMode
         type: string
         index: 16
         priority: 1
@@ -89,3 +89,70 @@ resources:
         json_path: .status.lifeCycleState
         type: string
         index: 30
+  MountTarget:
+    tags:
+      ignore: true
+    fields:
+      FileSystemId:
+        references:
+          resource: FileSystem
+          path: Status.FileSystemID
+      SubnetId:
+        references:
+          resource: Subnet
+          path: Status.SubnetID
+          service_name: ec2
+      SecurityGroups:
+        references:
+          resource: SecurityGroup
+          path: Status.ID
+          service_name: ec2
+    update_operation:
+      custom_method_name: customUpdateMountTarget
+    hooks:
+      sdk_create_post_set_output:
+        template_path: hooks/mount_target/sdk_create_post_set_output.go.tpl
+      sdk_read_many_post_build_request:
+        template_path: hooks/mount_target/sdk_read_many_post_build_request.go.tpl
+      sdk_read_many_post_set_output:
+        template_path: hooks/mount_target/sdk_read_many_post_set_output.go.tpl
+    print:
+      add_age_column: true
+      add_synced_column: true
+      order_by: index
+      additional_columns:
+      - name: FILESYSTEMID
+        json_path: .spec.fileSystemID
+        type: string
+        index: 10
+      - name: MOUNTTARGETID
+        json_path: .status.mountTargetID
+        type: string
+        index: 30
+      - name: IPADDRESS
+        json_path: .spec.ipAddress
+        type: string
+        index: 20
+      - name: SUBNETID
+        json_path: .spec.subnetID
+        type: string
+        index: 30
+      - name: VPCID
+        json_path: .status.vpcID
+        type: string
+        index: 35
+        priority: 1
+      - name: AVAILABILITYZONEID
+        json_path: .status.availabilityZoneID
+        type: string
+        index: 36
+        priority: 1
+      - name: AVAILABILITYZONENAME
+        json_path: .status.availabilityZoneName
+        type: string
+        index: 37
+        priority: 1
+      - name: STATE
+        json_path: .status.lifeCycleState
+        type: string
+        index: 40

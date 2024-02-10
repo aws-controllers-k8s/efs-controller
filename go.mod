@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.5
 
 require (
+	github.com/aws-controllers-k8s/ec2-controller v1.2.2
 	github.com/aws-controllers-k8s/kms-controller v1.0.9
 	github.com/aws-controllers-k8s/runtime v0.29.2
 	github.com/aws/aws-sdk-go v1.49.24

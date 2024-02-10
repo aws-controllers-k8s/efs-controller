@@ -18,14 +18,14 @@ spec:
     - jsonPath: .status.fileSystemID
       name: ID
       type: string
-    - jsonPath: .status.encrypted
+    - jsonPath: .spec.encrypted
       name: ENCRYPTED
       type: boolean
-    - jsonPath: .status.performanceMode
+    - jsonPath: .spec.performanceMode
       name: PERFORMANCEMODE
       priority: 1
       type: string
-    - jsonPath: .status.throughputMode
+    - jsonPath: .spec.throughputMode
       name: THROUGHPUTMODE
       priority: 1
       type: string

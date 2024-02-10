@@ -66,3 +66,17 @@ class EFSValidator:
         except Exception as e:
             logging.debug(e)
             return None
+        
+    def get_mount_target(self, mount_target_id: str) -> list:
+        try:
+            resp = self.efs_client.describe_mount_targets(
+                MountTargetId=mount_target_id
+            )
+            return resp["MountTargets"][0]
+
+        except Exception as e:
+            logging.debug(e)
+            return None
+        
+    def mount_target_exists(self, mount_target_id) -> bool:
+        return self.get_mount_target(mount_target_id) is not None
