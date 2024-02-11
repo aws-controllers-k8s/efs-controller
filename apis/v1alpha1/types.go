@@ -30,11 +30,23 @@ var (
 
 // Provides a description of an EFS file system access point.
 type AccessPointDescription struct {
+	AccessPointARN *string `json:"accessPointARN,omitempty"`
 	AccessPointID  *string `json:"accessPointID,omitempty"`
 	FileSystemID   *string `json:"fileSystemID,omitempty"`
 	LifeCycleState *string `json:"lifeCycleState,omitempty"`
+	Name           *string `json:"name,omitempty"`
 	OwnerID        *string `json:"ownerID,omitempty"`
-	Tags           []*Tag  `json:"tags,omitempty"`
+	// The full POSIX identity, including the user ID, group ID, and any secondary
+	// group IDs, on the access point that is used for all file system operations
+	// performed by NFS clients using the access point.
+	PosixUser *PosixUser `json:"posixUser,omitempty"`
+	// Specifies the directory on the Amazon EFS file system that the access point
+	// provides access to. The access point exposes the specified file system path
+	// as the root directory of your file system to applications using the access
+	// point. NFS clients using the access point can only access data in the access
+	// point's RootDirectory and it's subdirectories.
+	RootDirectory *RootDirectory `json:"rootDirectory,omitempty"`
+	Tags          []*Tag         `json:"tags,omitempty"`
 }
 
 // The backup policy for the file system used to create automatic daily backups.
@@ -42,6 +54,25 @@ type AccessPointDescription struct {
 // backed up. For more information, see Automatic backups (https://docs.aws.amazon.com/efs/latest/ug/awsbackup.html#automatic-backups).
 type BackupPolicy struct {
 	Status *string `json:"status,omitempty"`
+}
+
+// Required if the RootDirectory > Path specified does not exist. Specifies
+// the POSIX IDs and permissions to apply to the access point's RootDirectory
+// > Path. If the access point root directory does not exist, EFS creates it
+// with these settings when a client connects to the access point. When specifying
+// CreationInfo, you must include values for all properties.
+//
+// Amazon EFS creates a root directory only if you have provided the CreationInfo:
+// OwnUid, OwnGID, and permissions for the directory. If you do not provide
+// this information, Amazon EFS does not create the root directory. If the root
+// directory does not exist, attempts to mount using the access point will fail.
+//
+// If you do not provide CreationInfo and the specified RootDirectory does not
+// exist, attempts to mount the file system using the access point will fail.
+type CreationInfo struct {
+	OwnerGID    *int64  `json:"ownerGID,omitempty"`
+	OwnerUID    *int64  `json:"ownerUID,omitempty"`
+	Permissions *string `json:"permissions,omitempty"`
 }
 
 // Describes the destination file system in the replication configuration.
@@ -138,12 +169,44 @@ type MountTargetDescription struct {
 	VPCID                *string `json:"vpcID,omitempty"`
 }
 
+// The full POSIX identity, including the user ID, group ID, and any secondary
+// group IDs, on the access point that is used for all file system operations
+// performed by NFS clients using the access point.
+type PosixUser struct {
+	GID           *int64   `json:"gid,omitempty"`
+	SecondaryGIDs []*int64 `json:"secondaryGIDs,omitempty"`
+	UID           *int64   `json:"uid,omitempty"`
+}
+
 // Describes the replication configuration for a specific file system.
 type ReplicationConfigurationDescription struct {
 	CreationTime                *metav1.Time `json:"creationTime,omitempty"`
 	OriginalSourceFileSystemARN *string      `json:"originalSourceFileSystemARN,omitempty"`
 	SourceFileSystemARN         *string      `json:"sourceFileSystemARN,omitempty"`
 	SourceFileSystemID          *string      `json:"sourceFileSystemID,omitempty"`
+}
+
+// Specifies the directory on the Amazon EFS file system that the access point
+// provides access to. The access point exposes the specified file system path
+// as the root directory of your file system to applications using the access
+// point. NFS clients using the access point can only access data in the access
+// point's RootDirectory and it's subdirectories.
+type RootDirectory struct {
+	// Required if the RootDirectory > Path specified does not exist. Specifies
+	// the POSIX IDs and permissions to apply to the access point's RootDirectory
+	// > Path. If the access point root directory does not exist, EFS creates it
+	// with these settings when a client connects to the access point. When specifying
+	// CreationInfo, you must include values for all properties.
+	//
+	// Amazon EFS creates a root directory only if you have provided the CreationInfo:
+	// OwnUid, OwnGID, and permissions for the directory. If you do not provide
+	// this information, Amazon EFS does not create the root directory. If the root
+	// directory does not exist, attempts to mount using the access point will fail.
+	//
+	// If you do not provide CreationInfo and the specified RootDirectory does not
+	// exist, attempts to mount the file system using the access point will fail.
+	CreationInfo *CreationInfo `json:"creationInfo,omitempty"`
+	Path         *string       `json:"path,omitempty"`
 }
 
 // A tag is a key-value pair. Allowed characters are letters, white space, and

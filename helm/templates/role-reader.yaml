@@ -9,6 +9,7 @@ rules:
 - apiGroups:
   - efs.services.k8s.aws
   resources:
+  - accesspoints
   - filesystems
   - mounttargets
   verbs:
