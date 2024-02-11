@@ -1,6 +1,6 @@
 ignore:
   resource_names:
-      - AccessPoint
+      # AccessPoint
       # FileSystem
       # MountTarget
       - ReplicationConfiguration
@@ -11,6 +11,13 @@ ignore:
   - PutLifecycleConfigurationInput.FileSystemId
   - PutFileSystemPolicyInput.FileSystemId
   - UpdateFileSystemProtectionInput.FileSystemId
+  # Well, FileSystem idempotency token is called CreationToken
+  # and AccessPoint idempotency token is called ClientToken.....
+  - CreateAccessPointInput.ClientToken
+  - AccessPointDescription.ClientToken
+  shape_names:
+  - SecondaryGids
+  - ClientToken
 model_name: elasticfilesystem
 controller_name: efs
 resources:
@@ -45,6 +52,8 @@ resources:
         code: return desired, nil
       sdk_create_post_set_output:
         template_path: hooks/file_system/sdk_create_post_set_output.go.tpl
+      sdk_create_post_build_request:
+        template_path: hooks/file_system/sdk_create_post_build_request.go.tpl
       sdk_read_many_post_set_output:
         template_path: hooks/file_system/sdk_read_many_post_set_output.go.tpl
       sdk_update_pre_build_request:
@@ -152,6 +161,67 @@ resources:
         type: string
         index: 37
         priority: 1
+      - name: STATE
+        json_path: .status.lifeCycleState
+        type: string
+        index: 40
+  AccessPoint:
+    fields:
+      PosixUser:
+        is_immutable: true
+      RootDirectory:
+        is_immutable: true
+      PosixUser.SecondaryGids:
+        type: "[]*int64"
+        compare:
+          is_ignored: true
+      # This is a workaround for the fact that code-generator
+      # isn't smart enough to understand this.
+      # TODO(a-hilaly): Remove this once the issue is fixed
+      PosixUser.SecondaryGIDs:
+        compare:
+          is_ignored: true
+      FileSystemId:
+        references:
+          resource: FileSystem
+          path: Status.FileSystemID
+        is_immutable: true
+    update_operation:
+      custom_method_name: customUpdateAccessPoint
+    hooks:
+      delta_pre_compare:
+        code: customPreCompare(delta, a, b)
+      sdk_create_post_build_request:
+        template_path: hooks/access_point/sdk_create_post_build_request.go.tpl
+      sdk_read_many_post_build_request:
+        template_path: hooks/access_point/sdk_read_many_post_build_request.go.tpl
+      sdk_read_many_post_set_output:
+        template_path: hooks/access_point/sdk_read_many_post_set_output.go.tpl
+    print:
+      add_age_column: true
+      add_synced_column: true
+      order_by: index
+      additional_columns:
+      - name: ID
+        json_path: .status.accessPointID
+        type: string
+        index: 5
+      - name: FILESYSTEMID
+        json_path: .spec.fileSystemID
+        type: string
+        index: 10
+      - name: ROOTDIRECTORY
+        json_path: .spec.rootDirectory.path
+        type: string
+        index: 20
+      - name: POSIXUSERUID
+        json_path: .spec.posixUser.uid
+        type: integer
+        index: 25
+      - name: POSIXUSERGID
+        json_path: .spec.posixUser.gid
+        type: integer
+        index: 30
       - name: STATE
         json_path: .status.lifeCycleState
         type: string

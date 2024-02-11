@@ -28,6 +28,13 @@ import (
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
 )
 
+// getIdempotencyToken returns a unique string to be used in certain API calls
+// to ensure no replay of the call.
+func getIdempotencyToken() string {
+	t := time.Now().UTC()
+	return t.Format("20060102150405000000")
+}
+
 var (
 	// TerminalStatuses are the status strings that are terminal states for a
 	// filesystem.

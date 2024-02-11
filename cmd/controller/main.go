@@ -40,6 +40,7 @@ import (
 	svcresource "github.com/aws-controllers-k8s/efs-controller/pkg/resource"
 	svcsdk "github.com/aws/aws-sdk-go/service/efs"
 
+	_ "github.com/aws-controllers-k8s/efs-controller/pkg/resource/access_point"
 	_ "github.com/aws-controllers-k8s/efs-controller/pkg/resource/file_system"
 	_ "github.com/aws-controllers-k8s/efs-controller/pkg/resource/mount_target"
 

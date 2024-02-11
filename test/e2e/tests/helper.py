@@ -80,3 +80,16 @@ class EFSValidator:
         
     def mount_target_exists(self, mount_target_id) -> bool:
         return self.get_mount_target(mount_target_id) is not None
+    
+    def get_access_point(self, access_point_id: str) -> list:
+        try:
+            resp = self.efs_client.describe_access_points(
+                AccessPointId=access_point_id
+            )
+            return resp["AccessPoints"][0]
+
+        except Exception as e:
+            return None
+        
+    def access_point_exists(self, access_point_id) -> bool:
+        return self.get_access_point(access_point_id) is not None

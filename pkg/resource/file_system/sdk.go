@@ -264,6 +264,8 @@ func (rm *resourceManager) sdkCreate(
 	if err != nil {
 		return nil, err
 	}
+	// This is an idempotency token required in the API call...
+	input.SetCreationToken(getIdempotencyToken())
 
 	var resp *svcsdk.FileSystemDescription
 	_ = resp
