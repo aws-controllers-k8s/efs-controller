@@ -5,15 +5,18 @@ annotations:
   capabilityLevel: Basic Install
   shortDescription: AWS EFS controller is a service controller for managing EFS resources
     in Kubernetes
-displayName: AWS Controllers for Kubernetes - Amazon EFS
+displayName: AWS Controllers for Kubernetes - Amazon Elastic File System (Amazon EFS)
 description: |-
   Manage Amazon EFS resources in AWS from within your Kubernetes cluster.
 
 
-  **About Amazon EFS**
+  **About Amazon Elastic File System (Amazon EFS)**
 
 
-  {ADD YOUR DESCRIPTION HERE}
+  Amazon Elastic File System (Amazon EFS) provides serverless, fully elastic file storage so that you can share file data without provisioning or managing storage capacity and performance. 
+  Amazon EFS is built to scale on demand to petabytes without disrupting applications, growing and shrinking automatically as you add and remove files. Because Amazon EFS has a simple web services interface, 
+  you can create and configure file systems quickly and easily. The service manages all the file storage infrastructure for you, meaning that you can avoid the complexity of deploying, patching, 
+  and maintaining complex file system configurations.
 
 
   **About the AWS Controllers for Kubernetes**
@@ -28,13 +31,15 @@ description: |-
 
   Please follow the following link: [Red Hat OpenShift](https://aws-controllers-k8s.github.io/community/docs/user-docs/openshift/)
 samples:
-- kind: ExampleCustomKind
+- kind: AccessPoint
   spec: '{}'
-- kind: SecondExampleCustomKind
+- kind: FileSystem
+  spec: '{}'
+- kind: MountTarget
   spec: '{}'
 maintainers:
 - name: "efs maintainer team"
   email: "ack-maintainers@amazon.com"
 links:
 - name: Amazon EFS Developer Resources
-  url: https://aws.amazon.com/EFS/developer-resources/
+  url: https://aws.amazon.com/efs/resources/
