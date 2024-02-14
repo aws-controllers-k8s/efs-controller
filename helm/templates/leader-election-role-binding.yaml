@@ -14,5 +14,5 @@ roleRef:
   name: efs-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: {{ include "service-account.name" . }}
+  name: {{ include "ack-efs-controller.service-account.name" . }}
   namespace: {{ .Release.Namespace }}{{- end }}
