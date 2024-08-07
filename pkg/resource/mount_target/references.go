@@ -71,24 +71,23 @@ func (rm *resourceManager) ResolveReferences(
 	apiReader client.Reader,
 	res acktypes.AWSResource,
 ) (acktypes.AWSResource, bool, error) {
-	namespace := res.MetaObject().GetNamespace()
 	ko := rm.concreteResource(res).ko
 
 	resourceHasReferences := false
 	err := validateReferenceFields(ko)
-	if fieldHasReferences, err := rm.resolveReferenceForFileSystemID(ctx, apiReader, namespace, ko); err != nil {
+	if fieldHasReferences, err := rm.resolveReferenceForFileSystemID(ctx, apiReader, ko); err != nil {
 		return &resource{ko}, (resourceHasReferences || fieldHasReferences), err
 	} else {
 		resourceHasReferences = resourceHasReferences || fieldHasReferences
 	}
 
-	if fieldHasReferences, err := rm.resolveReferenceForSecurityGroups(ctx, apiReader, namespace, ko); err != nil {
+	if fieldHasReferences, err := rm.resolveReferenceForSecurityGroups(ctx, apiReader, ko); err != nil {
 		return &resource{ko}, (resourceHasReferences || fieldHasReferences), err
 	} else {
 		resourceHasReferences = resourceHasReferences || fieldHasReferences
 	}
 
-	if fieldHasReferences, err := rm.resolveReferenceForSubnetID(ctx, apiReader, namespace, ko); err != nil {
+	if fieldHasReferences, err := rm.resolveReferenceForSubnetID(ctx, apiReader, ko); err != nil {
 		return &resource{ko}, (resourceHasReferences || fieldHasReferences), err
 	} else {
 		resourceHasReferences = resourceHasReferences || fieldHasReferences
@@ -128,7 +127,6 @@ func validateReferenceFields(ko *svcapitypes.MountTarget) error {
 func (rm *resourceManager) resolveReferenceForFileSystemID(
 	ctx context.Context,
 	apiReader client.Reader,
-	namespace string,
 	ko *svcapitypes.MountTarget,
 ) (hasReferences bool, err error) {
 	if ko.Spec.FileSystemRef != nil && ko.Spec.FileSystemRef.From != nil {
@@ -136,6 +134,10 @@ func (rm *resourceManager) resolveReferenceForFileSystemID(
 		arr := ko.Spec.FileSystemRef.From
 		if arr.Name == nil || *arr.Name == "" {
 			return hasReferences, fmt.Errorf("provided resource reference is nil or empty: FileSystemRef")
+		}
+		namespace := ko.ObjectMeta.GetNamespace()
+		if arr.Namespace != nil && *arr.Namespace != "" {
+			namespace = *arr.Namespace
 		}
 		obj := &svcapitypes.FileSystem{}
 		if err := getReferencedResourceState_FileSystem(ctx, apiReader, obj, *arr.Name, namespace); err != nil {
@@ -205,7 +207,6 @@ func getReferencedResourceState_FileSystem(
 func (rm *resourceManager) resolveReferenceForSecurityGroups(
 	ctx context.Context,
 	apiReader client.Reader,
-	namespace string,
 	ko *svcapitypes.MountTarget,
 ) (hasReferences bool, err error) {
 	for _, f0iter := range ko.Spec.SecurityGroupRefs {
@@ -214,6 +215,10 @@ func (rm *resourceManager) resolveReferenceForSecurityGroups(
 			arr := f0iter.From
 			if arr.Name == nil || *arr.Name == "" {
 				return hasReferences, fmt.Errorf("provided resource reference is nil or empty: SecurityGroupRefs")
+			}
+			namespace := ko.ObjectMeta.GetNamespace()
+			if arr.Namespace != nil && *arr.Namespace != "" {
+				namespace = *arr.Namespace
 			}
 			obj := &ec2apitypes.SecurityGroup{}
 			if err := getReferencedResourceState_SecurityGroup(ctx, apiReader, obj, *arr.Name, namespace); err != nil {
@@ -287,7 +292,6 @@ func getReferencedResourceState_SecurityGroup(
 func (rm *resourceManager) resolveReferenceForSubnetID(
 	ctx context.Context,
 	apiReader client.Reader,
-	namespace string,
 	ko *svcapitypes.MountTarget,
 ) (hasReferences bool, err error) {
 	if ko.Spec.SubnetRef != nil && ko.Spec.SubnetRef.From != nil {
@@ -295,6 +299,10 @@ func (rm *resourceManager) resolveReferenceForSubnetID(
 		arr := ko.Spec.SubnetRef.From
 		if arr.Name == nil || *arr.Name == "" {
 			return hasReferences, fmt.Errorf("provided resource reference is nil or empty: SubnetRef")
+		}
+		namespace := ko.ObjectMeta.GetNamespace()
+		if arr.Namespace != nil && *arr.Namespace != "" {
+			namespace = *arr.Namespace
 		}
 		obj := &ec2apitypes.Subnet{}
 		if err := getReferencedResourceState_Subnet(ctx, apiReader, obj, *arr.Name, namespace); err != nil {
