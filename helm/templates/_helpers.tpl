@@ -55,6 +55,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - secrets
   verbs:
   - get
   - list
@@ -69,38 +70,11 @@ rules:
   - list
   - watch
 - apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-  - patch
-  - watch
-- apiGroups:
   - ec2.services.k8s.aws
   resources:
   - securitygroups
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ec2.services.k8s.aws
-  resources:
   - securitygroups/status
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ec2.services.k8s.aws
-  resources:
   - subnets
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ec2.services.k8s.aws
-  resources:
   - subnets/status
   verbs:
   - get
@@ -109,45 +83,7 @@ rules:
   - efs.services.k8s.aws
   resources:
   - accesspoints
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - efs.services.k8s.aws
-  resources:
-  - accesspoints/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - efs.services.k8s.aws
-  resources:
   - filesystems
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - efs.services.k8s.aws
-  resources:
-  - filesystems/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - efs.services.k8s.aws
-  resources:
   - mounttargets
   verbs:
   - create
@@ -160,6 +96,8 @@ rules:
 - apiGroups:
   - efs.services.k8s.aws
   resources:
+  - accesspoints/status
+  - filesystems/status
   - mounttargets/status
   verbs:
   - get
@@ -169,12 +107,6 @@ rules:
   - kms.services.k8s.aws
   resources:
   - keys
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - kms.services.k8s.aws
-  resources:
   - keys/status
   verbs:
   - get
@@ -183,25 +115,6 @@ rules:
   - services.k8s.aws
   resources:
   - adoptedresources
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - services.k8s.aws
-  resources:
-  - adoptedresources/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - services.k8s.aws
-  resources:
   - fieldexports
   verbs:
   - create
@@ -214,6 +127,7 @@ rules:
 - apiGroups:
   - services.k8s.aws
   resources:
+  - adoptedresources/status
   - fieldexports/status
   verbs:
   - get
