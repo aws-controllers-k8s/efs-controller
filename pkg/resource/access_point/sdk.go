@@ -28,8 +28,10 @@ import (
 	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
-	"github.com/aws/aws-sdk-go/aws"
-	svcsdk "github.com/aws/aws-sdk-go/service/efs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
+	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	smithy "github.com/aws/smithy-go"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,8 +42,7 @@ import (
 var (
 	_ = &metav1.Time{}
 	_ = strings.ToLower("")
-	_ = &aws.JSONValue{}
-	_ = &svcsdk.EFS{}
+	_ = &svcsdk.Client{}
 	_ = &svcapitypes.AccessPoint{}
 	_ = ackv1alpha1.AWSAccountID("")
 	_ = &ackerr.NotFound
@@ -49,6 +50,7 @@ var (
 	_ = &reflect.Value{}
 	_ = fmt.Sprintf("")
 	_ = &ackrequeue.NoRequeue{}
+	_ = &aws.Config{}
 )
 
 // sdkFind returns SDK-specific information about a supplied resource
@@ -74,10 +76,11 @@ func (rm *resourceManager) sdkFind(
 	}
 	input.FileSystemId = nil
 	var resp *svcsdk.DescribeAccessPointsOutput
-	resp, err = rm.sdkapi.DescribeAccessPointsWithContext(ctx, input)
+	resp, err = rm.sdkapi.DescribeAccessPoints(ctx, input)
 	rm.metrics.RecordAPICall("READ_MANY", "DescribeAccessPoints", err)
 	if err != nil {
-		if awsErr, ok := ackerr.AWSError(err); ok && awsErr.Code() == "FileSystemNotFound" {
+		var awsErr smithy.APIError
+		if errors.As(err, &awsErr) && awsErr.ErrorCode() == "AccessPointNotFound" {
 			return nil, ackerr.NotFound
 		}
 		return nil, err
@@ -106,8 +109,8 @@ func (rm *resourceManager) sdkFind(
 		} else {
 			ko.Spec.FileSystemID = nil
 		}
-		if elem.LifeCycleState != nil {
-			ko.Status.LifeCycleState = elem.LifeCycleState
+		if elem.LifeCycleState != "" {
+			ko.Status.LifeCycleState = aws.String(string(elem.LifeCycleState))
 		} else {
 			ko.Status.LifeCycleState = nil
 		}
@@ -127,13 +130,7 @@ func (rm *resourceManager) sdkFind(
 				f6.GID = elem.PosixUser.Gid
 			}
 			if elem.PosixUser.SecondaryGids != nil {
-				f6f1 := []*int64{}
-				for _, f6f1iter := range elem.PosixUser.SecondaryGids {
-					var f6f1elem int64
-					f6f1elem = *f6f1iter
-					f6f1 = append(f6f1, &f6f1elem)
-				}
-				f6.SecondaryGIDs = f6f1
+				f6.SecondaryGIDs = aws.Int64Slice(elem.PosixUser.SecondaryGids)
 			}
 			if elem.PosixUser.Uid != nil {
 				f6.UID = elem.PosixUser.Uid
@@ -213,10 +210,10 @@ func (rm *resourceManager) newListRequestPayload(
 	res := &svcsdk.DescribeAccessPointsInput{}
 
 	if r.ko.Status.AccessPointID != nil {
-		res.SetAccessPointId(*r.ko.Status.AccessPointID)
+		res.AccessPointId = r.ko.Status.AccessPointID
 	}
 	if r.ko.Spec.FileSystemID != nil {
-		res.SetFileSystemId(*r.ko.Spec.FileSystemID)
+		res.FileSystemId = r.ko.Spec.FileSystemID
 	}
 
 	return res, nil
@@ -239,11 +236,11 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.SetClientToken(getIdempotencyToken())
+	input.ClientToken = aws.String(getIdempotencyToken())
 
 	var resp *svcsdk.CreateAccessPointOutput
 	_ = resp
-	resp, err = rm.sdkapi.CreateAccessPointWithContext(ctx, input)
+	resp, err = rm.sdkapi.CreateAccessPoint(ctx, input)
 	rm.metrics.RecordAPICall("CREATE", "CreateAccessPoint", err)
 	if err != nil {
 		return nil, err
@@ -269,8 +266,8 @@ func (rm *resourceManager) sdkCreate(
 	} else {
 		ko.Spec.FileSystemID = nil
 	}
-	if resp.LifeCycleState != nil {
-		ko.Status.LifeCycleState = resp.LifeCycleState
+	if resp.LifeCycleState != "" {
+		ko.Status.LifeCycleState = aws.String(string(resp.LifeCycleState))
 	} else {
 		ko.Status.LifeCycleState = nil
 	}
@@ -290,13 +287,7 @@ func (rm *resourceManager) sdkCreate(
 			f6.GID = resp.PosixUser.Gid
 		}
 		if resp.PosixUser.SecondaryGids != nil {
-			f6f1 := []*int64{}
-			for _, f6f1iter := range resp.PosixUser.SecondaryGids {
-				var f6f1elem int64
-				f6f1elem = *f6f1iter
-				f6f1 = append(f6f1, &f6f1elem)
-			}
-			f6.SecondaryGIDs = f6f1
+			f6.SecondaryGIDs = aws.Int64Slice(resp.PosixUser.SecondaryGids)
 		}
 		if resp.PosixUser.Uid != nil {
 			f6.UID = resp.PosixUser.Uid
@@ -357,60 +348,54 @@ func (rm *resourceManager) newCreateRequestPayload(
 	res := &svcsdk.CreateAccessPointInput{}
 
 	if r.ko.Spec.FileSystemID != nil {
-		res.SetFileSystemId(*r.ko.Spec.FileSystemID)
+		res.FileSystemId = r.ko.Spec.FileSystemID
 	}
 	if r.ko.Spec.PosixUser != nil {
-		f1 := &svcsdk.PosixUser{}
+		f1 := &svcsdktypes.PosixUser{}
 		if r.ko.Spec.PosixUser.GID != nil {
-			f1.SetGid(*r.ko.Spec.PosixUser.GID)
+			f1.Gid = r.ko.Spec.PosixUser.GID
 		}
 		if r.ko.Spec.PosixUser.SecondaryGIDs != nil {
-			f1f1 := []*int64{}
-			for _, f1f1iter := range r.ko.Spec.PosixUser.SecondaryGIDs {
-				var f1f1elem int64
-				f1f1elem = *f1f1iter
-				f1f1 = append(f1f1, &f1f1elem)
-			}
-			f1.SetSecondaryGids(f1f1)
+			f1.SecondaryGids = aws.ToInt64Slice(r.ko.Spec.PosixUser.SecondaryGIDs)
 		}
 		if r.ko.Spec.PosixUser.UID != nil {
-			f1.SetUid(*r.ko.Spec.PosixUser.UID)
+			f1.Uid = r.ko.Spec.PosixUser.UID
 		}
-		res.SetPosixUser(f1)
+		res.PosixUser = f1
 	}
 	if r.ko.Spec.RootDirectory != nil {
-		f2 := &svcsdk.RootDirectory{}
+		f2 := &svcsdktypes.RootDirectory{}
 		if r.ko.Spec.RootDirectory.CreationInfo != nil {
-			f2f0 := &svcsdk.CreationInfo{}
+			f2f0 := &svcsdktypes.CreationInfo{}
 			if r.ko.Spec.RootDirectory.CreationInfo.OwnerGID != nil {
-				f2f0.SetOwnerGid(*r.ko.Spec.RootDirectory.CreationInfo.OwnerGID)
+				f2f0.OwnerGid = r.ko.Spec.RootDirectory.CreationInfo.OwnerGID
 			}
 			if r.ko.Spec.RootDirectory.CreationInfo.OwnerUID != nil {
-				f2f0.SetOwnerUid(*r.ko.Spec.RootDirectory.CreationInfo.OwnerUID)
+				f2f0.OwnerUid = r.ko.Spec.RootDirectory.CreationInfo.OwnerUID
 			}
 			if r.ko.Spec.RootDirectory.CreationInfo.Permissions != nil {
-				f2f0.SetPermissions(*r.ko.Spec.RootDirectory.CreationInfo.Permissions)
+				f2f0.Permissions = r.ko.Spec.RootDirectory.CreationInfo.Permissions
 			}
-			f2.SetCreationInfo(f2f0)
+			f2.CreationInfo = f2f0
 		}
 		if r.ko.Spec.RootDirectory.Path != nil {
-			f2.SetPath(*r.ko.Spec.RootDirectory.Path)
+			f2.Path = r.ko.Spec.RootDirectory.Path
 		}
-		res.SetRootDirectory(f2)
+		res.RootDirectory = f2
 	}
 	if r.ko.Spec.Tags != nil {
-		f3 := []*svcsdk.Tag{}
+		f3 := []svcsdktypes.Tag{}
 		for _, f3iter := range r.ko.Spec.Tags {
-			f3elem := &svcsdk.Tag{}
+			f3elem := &svcsdktypes.Tag{}
 			if f3iter.Key != nil {
-				f3elem.SetKey(*f3iter.Key)
+				f3elem.Key = f3iter.Key
 			}
 			if f3iter.Value != nil {
-				f3elem.SetValue(*f3iter.Value)
+				f3elem.Value = f3iter.Value
 			}
-			f3 = append(f3, f3elem)
+			f3 = append(f3, *f3elem)
 		}
-		res.SetTags(f3)
+		res.Tags = f3
 	}
 
 	return res, nil
@@ -443,7 +428,7 @@ func (rm *resourceManager) sdkDelete(
 	}
 	var resp *svcsdk.DeleteAccessPointOutput
 	_ = resp
-	resp, err = rm.sdkapi.DeleteAccessPointWithContext(ctx, input)
+	resp, err = rm.sdkapi.DeleteAccessPoint(ctx, input)
 	rm.metrics.RecordAPICall("DELETE", "DeleteAccessPoint", err)
 	return nil, err
 }
@@ -456,7 +441,7 @@ func (rm *resourceManager) newDeleteRequestPayload(
 	res := &svcsdk.DeleteAccessPointInput{}
 
 	if r.ko.Status.AccessPointID != nil {
-		res.SetAccessPointId(*r.ko.Status.AccessPointID)
+		res.AccessPointId = r.ko.Status.AccessPointID
 	}
 
 	return res, nil

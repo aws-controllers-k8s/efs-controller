@@ -28,8 +28,10 @@ import (
 	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
-	"github.com/aws/aws-sdk-go/aws"
-	svcsdk "github.com/aws/aws-sdk-go/service/efs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
+	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	smithy "github.com/aws/smithy-go"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,8 +42,7 @@ import (
 var (
 	_ = &metav1.Time{}
 	_ = strings.ToLower("")
-	_ = &aws.JSONValue{}
-	_ = &svcsdk.EFS{}
+	_ = &svcsdk.Client{}
 	_ = &svcapitypes.FileSystem{}
 	_ = ackv1alpha1.AWSAccountID("")
 	_ = &ackerr.NotFound
@@ -49,6 +50,7 @@ var (
 	_ = &reflect.Value{}
 	_ = fmt.Sprintf("")
 	_ = &ackrequeue.NoRequeue{}
+	_ = &aws.Config{}
 )
 
 // sdkFind returns SDK-specific information about a supplied resource
@@ -73,10 +75,11 @@ func (rm *resourceManager) sdkFind(
 		return nil, err
 	}
 	var resp *svcsdk.DescribeFileSystemsOutput
-	resp, err = rm.sdkapi.DescribeFileSystemsWithContext(ctx, input)
+	resp, err = rm.sdkapi.DescribeFileSystems(ctx, input)
 	rm.metrics.RecordAPICall("READ_MANY", "DescribeFileSystems", err)
 	if err != nil {
-		if awsErr, ok := ackerr.AWSError(err); ok && awsErr.Code() == "FileSystemNotFound" {
+		var awsErr smithy.APIError
+		if errors.As(err, &awsErr) && awsErr.ErrorCode() == "FileSystemNotFound" {
 			return nil, ackerr.NotFound
 		}
 		return nil, err
@@ -122,8 +125,8 @@ func (rm *resourceManager) sdkFind(
 		}
 		if elem.FileSystemProtection != nil {
 			f6 := &svcapitypes.UpdateFileSystemProtectionInput{}
-			if elem.FileSystemProtection.ReplicationOverwriteProtection != nil {
-				f6.ReplicationOverwriteProtection = elem.FileSystemProtection.ReplicationOverwriteProtection
+			if elem.FileSystemProtection.ReplicationOverwriteProtection != "" {
+				f6.ReplicationOverwriteProtection = aws.String(string(elem.FileSystemProtection.ReplicationOverwriteProtection))
 			}
 			ko.Spec.FileSystemProtection = f6
 		} else {
@@ -134,8 +137,8 @@ func (rm *resourceManager) sdkFind(
 		} else {
 			ko.Spec.KMSKeyID = nil
 		}
-		if elem.LifeCycleState != nil {
-			ko.Status.LifeCycleState = elem.LifeCycleState
+		if elem.LifeCycleState != "" {
+			ko.Status.LifeCycleState = aws.String(string(elem.LifeCycleState))
 		} else {
 			ko.Status.LifeCycleState = nil
 		}
@@ -144,18 +147,15 @@ func (rm *resourceManager) sdkFind(
 		} else {
 			ko.Status.Name = nil
 		}
-		if elem.NumberOfMountTargets != nil {
-			ko.Status.NumberOfMountTargets = elem.NumberOfMountTargets
-		} else {
-			ko.Status.NumberOfMountTargets = nil
-		}
+		numberOfMountTargetsCopy := int64(elem.NumberOfMountTargets)
+		ko.Status.NumberOfMountTargets = &numberOfMountTargetsCopy
 		if elem.OwnerId != nil {
 			ko.Status.OwnerID = elem.OwnerId
 		} else {
 			ko.Status.OwnerID = nil
 		}
-		if elem.PerformanceMode != nil {
-			ko.Spec.PerformanceMode = elem.PerformanceMode
+		if elem.PerformanceMode != "" {
+			ko.Spec.PerformanceMode = aws.String(string(elem.PerformanceMode))
 		} else {
 			ko.Spec.PerformanceMode = nil
 		}
@@ -169,9 +169,7 @@ func (rm *resourceManager) sdkFind(
 			if elem.SizeInBytes.Timestamp != nil {
 				f14.Timestamp = &metav1.Time{*elem.SizeInBytes.Timestamp}
 			}
-			if elem.SizeInBytes.Value != nil {
-				f14.Value = elem.SizeInBytes.Value
-			}
+			f14.Value = &elem.SizeInBytes.Value
 			if elem.SizeInBytes.ValueInArchive != nil {
 				f14.ValueInArchive = elem.SizeInBytes.ValueInArchive
 			}
@@ -201,8 +199,8 @@ func (rm *resourceManager) sdkFind(
 		} else {
 			ko.Spec.Tags = nil
 		}
-		if elem.ThroughputMode != nil {
-			ko.Spec.ThroughputMode = elem.ThroughputMode
+		if elem.ThroughputMode != "" {
+			ko.Spec.ThroughputMode = aws.String(string(elem.ThroughputMode))
 		} else {
 			ko.Spec.ThroughputMode = nil
 		}
@@ -242,7 +240,7 @@ func (rm *resourceManager) newListRequestPayload(
 	res := &svcsdk.DescribeFileSystemsInput{}
 
 	if r.ko.Status.FileSystemID != nil {
-		res.SetFileSystemId(*r.ko.Status.FileSystemID)
+		res.FileSystemId = r.ko.Status.FileSystemID
 	}
 
 	return res, nil
@@ -265,11 +263,11 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.SetCreationToken(getIdempotencyToken())
+	input.CreationToken = aws.String(getIdempotencyToken())
 
-	var resp *svcsdk.FileSystemDescription
+	var resp *svcsdk.CreateFileSystemOutput
 	_ = resp
-	resp, err = rm.sdkapi.CreateFileSystemWithContext(ctx, input)
+	resp, err = rm.sdkapi.CreateFileSystem(ctx, input)
 	rm.metrics.RecordAPICall("CREATE", "CreateFileSystem", err)
 	if err != nil {
 		return nil, err
@@ -312,8 +310,8 @@ func (rm *resourceManager) sdkCreate(
 	}
 	if resp.FileSystemProtection != nil {
 		f6 := &svcapitypes.UpdateFileSystemProtectionInput{}
-		if resp.FileSystemProtection.ReplicationOverwriteProtection != nil {
-			f6.ReplicationOverwriteProtection = resp.FileSystemProtection.ReplicationOverwriteProtection
+		if resp.FileSystemProtection.ReplicationOverwriteProtection != "" {
+			f6.ReplicationOverwriteProtection = aws.String(string(resp.FileSystemProtection.ReplicationOverwriteProtection))
 		}
 		ko.Spec.FileSystemProtection = f6
 	} else {
@@ -324,8 +322,8 @@ func (rm *resourceManager) sdkCreate(
 	} else {
 		ko.Spec.KMSKeyID = nil
 	}
-	if resp.LifeCycleState != nil {
-		ko.Status.LifeCycleState = resp.LifeCycleState
+	if resp.LifeCycleState != "" {
+		ko.Status.LifeCycleState = aws.String(string(resp.LifeCycleState))
 	} else {
 		ko.Status.LifeCycleState = nil
 	}
@@ -334,18 +332,15 @@ func (rm *resourceManager) sdkCreate(
 	} else {
 		ko.Status.Name = nil
 	}
-	if resp.NumberOfMountTargets != nil {
-		ko.Status.NumberOfMountTargets = resp.NumberOfMountTargets
-	} else {
-		ko.Status.NumberOfMountTargets = nil
-	}
+	numberOfMountTargetsCopy := int64(resp.NumberOfMountTargets)
+	ko.Status.NumberOfMountTargets = &numberOfMountTargetsCopy
 	if resp.OwnerId != nil {
 		ko.Status.OwnerID = resp.OwnerId
 	} else {
 		ko.Status.OwnerID = nil
 	}
-	if resp.PerformanceMode != nil {
-		ko.Spec.PerformanceMode = resp.PerformanceMode
+	if resp.PerformanceMode != "" {
+		ko.Spec.PerformanceMode = aws.String(string(resp.PerformanceMode))
 	} else {
 		ko.Spec.PerformanceMode = nil
 	}
@@ -359,9 +354,7 @@ func (rm *resourceManager) sdkCreate(
 		if resp.SizeInBytes.Timestamp != nil {
 			f14.Timestamp = &metav1.Time{*resp.SizeInBytes.Timestamp}
 		}
-		if resp.SizeInBytes.Value != nil {
-			f14.Value = resp.SizeInBytes.Value
-		}
+		f14.Value = &resp.SizeInBytes.Value
 		if resp.SizeInBytes.ValueInArchive != nil {
 			f14.ValueInArchive = resp.SizeInBytes.ValueInArchive
 		}
@@ -391,8 +384,8 @@ func (rm *resourceManager) sdkCreate(
 	} else {
 		ko.Spec.Tags = nil
 	}
-	if resp.ThroughputMode != nil {
-		ko.Spec.ThroughputMode = resp.ThroughputMode
+	if resp.ThroughputMode != "" {
+		ko.Spec.ThroughputMode = aws.String(string(resp.ThroughputMode))
 	} else {
 		ko.Spec.ThroughputMode = nil
 	}
@@ -419,39 +412,39 @@ func (rm *resourceManager) newCreateRequestPayload(
 	res := &svcsdk.CreateFileSystemInput{}
 
 	if r.ko.Spec.AvailabilityZoneName != nil {
-		res.SetAvailabilityZoneName(*r.ko.Spec.AvailabilityZoneName)
+		res.AvailabilityZoneName = r.ko.Spec.AvailabilityZoneName
 	}
 	if r.ko.Spec.Backup != nil {
-		res.SetBackup(*r.ko.Spec.Backup)
+		res.Backup = r.ko.Spec.Backup
 	}
 	if r.ko.Spec.Encrypted != nil {
-		res.SetEncrypted(*r.ko.Spec.Encrypted)
+		res.Encrypted = r.ko.Spec.Encrypted
 	}
 	if r.ko.Spec.KMSKeyID != nil {
-		res.SetKmsKeyId(*r.ko.Spec.KMSKeyID)
+		res.KmsKeyId = r.ko.Spec.KMSKeyID
 	}
 	if r.ko.Spec.PerformanceMode != nil {
-		res.SetPerformanceMode(*r.ko.Spec.PerformanceMode)
+		res.PerformanceMode = svcsdktypes.PerformanceMode(*r.ko.Spec.PerformanceMode)
 	}
 	if r.ko.Spec.ProvisionedThroughputInMiBps != nil {
-		res.SetProvisionedThroughputInMibps(*r.ko.Spec.ProvisionedThroughputInMiBps)
+		res.ProvisionedThroughputInMibps = r.ko.Spec.ProvisionedThroughputInMiBps
 	}
 	if r.ko.Spec.Tags != nil {
-		f6 := []*svcsdk.Tag{}
+		f6 := []svcsdktypes.Tag{}
 		for _, f6iter := range r.ko.Spec.Tags {
-			f6elem := &svcsdk.Tag{}
+			f6elem := &svcsdktypes.Tag{}
 			if f6iter.Key != nil {
-				f6elem.SetKey(*f6iter.Key)
+				f6elem.Key = f6iter.Key
 			}
 			if f6iter.Value != nil {
-				f6elem.SetValue(*f6iter.Value)
+				f6elem.Value = f6iter.Value
 			}
-			f6 = append(f6, f6elem)
+			f6 = append(f6, *f6elem)
 		}
-		res.SetTags(f6)
+		res.Tags = f6
 	}
 	if r.ko.Spec.ThroughputMode != nil {
-		res.SetThroughputMode(*r.ko.Spec.ThroughputMode)
+		res.ThroughputMode = svcsdktypes.ThroughputMode(*r.ko.Spec.ThroughputMode)
 	}
 
 	return res, nil
@@ -517,7 +510,7 @@ func (rm *resourceManager) sdkUpdate(
 
 	var resp *svcsdk.UpdateFileSystemOutput
 	_ = resp
-	resp, err = rm.sdkapi.UpdateFileSystemWithContext(ctx, input)
+	resp, err = rm.sdkapi.UpdateFileSystem(ctx, input)
 	return desired, nil
 	rm.metrics.RecordAPICall("UPDATE", "UpdateFileSystem", err)
 	if err != nil {
@@ -560,11 +553,11 @@ func (rm *resourceManager) sdkUpdate(
 		ko.Status.FileSystemID = nil
 	}
 	if resp.FileSystemProtection != nil {
-		f7 := &svcapitypes.UpdateFileSystemProtectionInput{}
-		if resp.FileSystemProtection.ReplicationOverwriteProtection != nil {
-			f7.ReplicationOverwriteProtection = resp.FileSystemProtection.ReplicationOverwriteProtection
+		f6 := &svcapitypes.UpdateFileSystemProtectionInput{}
+		if resp.FileSystemProtection.ReplicationOverwriteProtection != "" {
+			f6.ReplicationOverwriteProtection = aws.String(string(resp.FileSystemProtection.ReplicationOverwriteProtection))
 		}
-		ko.Spec.FileSystemProtection = f7
+		ko.Spec.FileSystemProtection = f6
 	} else {
 		ko.Spec.FileSystemProtection = nil
 	}
@@ -573,8 +566,8 @@ func (rm *resourceManager) sdkUpdate(
 	} else {
 		ko.Spec.KMSKeyID = nil
 	}
-	if resp.LifeCycleState != nil {
-		ko.Status.LifeCycleState = resp.LifeCycleState
+	if resp.LifeCycleState != "" {
+		ko.Status.LifeCycleState = aws.String(string(resp.LifeCycleState))
 	} else {
 		ko.Status.LifeCycleState = nil
 	}
@@ -583,18 +576,15 @@ func (rm *resourceManager) sdkUpdate(
 	} else {
 		ko.Status.Name = nil
 	}
-	if resp.NumberOfMountTargets != nil {
-		ko.Status.NumberOfMountTargets = resp.NumberOfMountTargets
-	} else {
-		ko.Status.NumberOfMountTargets = nil
-	}
+	numberOfMountTargetsCopy := int64(resp.NumberOfMountTargets)
+	ko.Status.NumberOfMountTargets = &numberOfMountTargetsCopy
 	if resp.OwnerId != nil {
 		ko.Status.OwnerID = resp.OwnerId
 	} else {
 		ko.Status.OwnerID = nil
 	}
-	if resp.PerformanceMode != nil {
-		ko.Spec.PerformanceMode = resp.PerformanceMode
+	if resp.PerformanceMode != "" {
+		ko.Spec.PerformanceMode = aws.String(string(resp.PerformanceMode))
 	} else {
 		ko.Spec.PerformanceMode = nil
 	}
@@ -604,44 +594,42 @@ func (rm *resourceManager) sdkUpdate(
 		ko.Spec.ProvisionedThroughputInMiBps = nil
 	}
 	if resp.SizeInBytes != nil {
-		f15 := &svcapitypes.FileSystemSize{}
+		f14 := &svcapitypes.FileSystemSize{}
 		if resp.SizeInBytes.Timestamp != nil {
-			f15.Timestamp = &metav1.Time{*resp.SizeInBytes.Timestamp}
+			f14.Timestamp = &metav1.Time{*resp.SizeInBytes.Timestamp}
 		}
-		if resp.SizeInBytes.Value != nil {
-			f15.Value = resp.SizeInBytes.Value
-		}
+		f14.Value = &resp.SizeInBytes.Value
 		if resp.SizeInBytes.ValueInArchive != nil {
-			f15.ValueInArchive = resp.SizeInBytes.ValueInArchive
+			f14.ValueInArchive = resp.SizeInBytes.ValueInArchive
 		}
 		if resp.SizeInBytes.ValueInIA != nil {
-			f15.ValueInIA = resp.SizeInBytes.ValueInIA
+			f14.ValueInIA = resp.SizeInBytes.ValueInIA
 		}
 		if resp.SizeInBytes.ValueInStandard != nil {
-			f15.ValueInStandard = resp.SizeInBytes.ValueInStandard
+			f14.ValueInStandard = resp.SizeInBytes.ValueInStandard
 		}
-		ko.Status.SizeInBytes = f15
+		ko.Status.SizeInBytes = f14
 	} else {
 		ko.Status.SizeInBytes = nil
 	}
 	if resp.Tags != nil {
-		f16 := []*svcapitypes.Tag{}
-		for _, f16iter := range resp.Tags {
-			f16elem := &svcapitypes.Tag{}
-			if f16iter.Key != nil {
-				f16elem.Key = f16iter.Key
+		f15 := []*svcapitypes.Tag{}
+		for _, f15iter := range resp.Tags {
+			f15elem := &svcapitypes.Tag{}
+			if f15iter.Key != nil {
+				f15elem.Key = f15iter.Key
 			}
-			if f16iter.Value != nil {
-				f16elem.Value = f16iter.Value
+			if f15iter.Value != nil {
+				f15elem.Value = f15iter.Value
 			}
-			f16 = append(f16, f16elem)
+			f15 = append(f15, f15elem)
 		}
-		ko.Spec.Tags = f16
+		ko.Spec.Tags = f15
 	} else {
 		ko.Spec.Tags = nil
 	}
-	if resp.ThroughputMode != nil {
-		ko.Spec.ThroughputMode = resp.ThroughputMode
+	if resp.ThroughputMode != "" {
+		ko.Spec.ThroughputMode = aws.String(string(resp.ThroughputMode))
 	} else {
 		ko.Spec.ThroughputMode = nil
 	}
@@ -660,13 +648,13 @@ func (rm *resourceManager) newUpdateRequestPayload(
 	res := &svcsdk.UpdateFileSystemInput{}
 
 	if r.ko.Status.FileSystemID != nil {
-		res.SetFileSystemId(*r.ko.Status.FileSystemID)
+		res.FileSystemId = r.ko.Status.FileSystemID
 	}
 	if r.ko.Spec.ProvisionedThroughputInMiBps != nil {
-		res.SetProvisionedThroughputInMibps(*r.ko.Spec.ProvisionedThroughputInMiBps)
+		res.ProvisionedThroughputInMibps = r.ko.Spec.ProvisionedThroughputInMiBps
 	}
 	if r.ko.Spec.ThroughputMode != nil {
-		res.SetThroughputMode(*r.ko.Spec.ThroughputMode)
+		res.ThroughputMode = svcsdktypes.ThroughputMode(*r.ko.Spec.ThroughputMode)
 	}
 
 	return res, nil
@@ -688,7 +676,7 @@ func (rm *resourceManager) sdkDelete(
 	}
 	var resp *svcsdk.DeleteFileSystemOutput
 	_ = resp
-	resp, err = rm.sdkapi.DeleteFileSystemWithContext(ctx, input)
+	resp, err = rm.sdkapi.DeleteFileSystem(ctx, input)
 	rm.metrics.RecordAPICall("DELETE", "DeleteFileSystem", err)
 	return nil, err
 }
@@ -701,7 +689,7 @@ func (rm *resourceManager) newDeleteRequestPayload(
 	res := &svcsdk.DeleteFileSystemInput{}
 
 	if r.ko.Status.FileSystemID != nil {
-		res.SetFileSystemId(*r.ko.Status.FileSystemID)
+		res.FileSystemId = r.ko.Status.FileSystemID
 	}
 
 	return res, nil

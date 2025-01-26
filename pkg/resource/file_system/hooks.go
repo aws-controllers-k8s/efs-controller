@@ -22,10 +22,12 @@ import (
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
-	svcsdk "github.com/aws/aws-sdk-go/service/efs"
+	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
+	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 // getIdempotencyToken returns a unique string to be used in certain API calls
@@ -80,7 +82,8 @@ func filesystemActive(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	return cs == string(svcapitypes.LifeCycleState_available)
+	lifeCycleState := string(svcapitypes.LifeCycleState_available)
+	return cs == lifeCycleState
 }
 
 // filesystemCreating returns true if the supplied filesystem is in the process of
@@ -90,7 +93,8 @@ func filesystemCreating(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	return cs == string(svcapitypes.LifeCycleState_creating)
+	lifeCycleState := string(svcapitypes.LifeCycleState_creating)
+	return cs == lifeCycleState
 }
 
 // filesystemDeleting returns true if the supplied filesystem is in the process of
@@ -100,7 +104,8 @@ func filesystemDeleting(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	return cs == string(svcapitypes.LifeCycleState_deleting)
+	lifeCycleState := string(svcapitypes.LifeCycleState_deleting)
+	return cs == lifeCycleState
 }
 
 // Ideally, a part of this code needs to be generated.. However since the
@@ -143,7 +148,7 @@ func (rm *resourceManager) getBackupPolicy(ctx context.Context, r *svcapitypes.F
 	defer func() { exit(err) }()
 
 	var output *svcsdk.DescribeBackupPolicyOutput
-	output, err = rm.sdkapi.DescribeBackupPolicyWithContext(
+	output, err = rm.sdkapi.DescribeBackupPolicy(
 		ctx,
 		&svcsdk.DescribeBackupPolicyInput{
 			FileSystemId: r.Status.FileSystemID,
@@ -157,7 +162,7 @@ func (rm *resourceManager) getBackupPolicy(ctx context.Context, r *svcapitypes.F
 		return nil, err
 	}
 	backupPolicy := &svcapitypes.BackupPolicy{
-		Status: output.BackupPolicy.Status,
+		Status: aws.String(string(output.BackupPolicy.Status)),
 	}
 
 	return backupPolicy, nil
@@ -170,7 +175,7 @@ func (rm *resourceManager) getPolicy(ctx context.Context, r *svcapitypes.FileSys
 	defer func() { exit(err) }()
 
 	var output *svcsdk.DescribeFileSystemPolicyOutput
-	output, err = rm.sdkapi.DescribeFileSystemPolicyWithContext(
+	output, err = rm.sdkapi.DescribeFileSystemPolicy(
 		ctx,
 		&svcsdk.DescribeFileSystemPolicyInput{
 			FileSystemId: r.Status.FileSystemID,
@@ -193,7 +198,7 @@ func (rm *resourceManager) getLifecyclePolicies(ctx context.Context, r *svcapity
 	defer func() { exit(err) }()
 
 	var output *svcsdk.DescribeLifecycleConfigurationOutput
-	output, err = rm.sdkapi.DescribeLifecycleConfigurationWithContext(
+	output, err = rm.sdkapi.DescribeLifecycleConfiguration(
 		ctx,
 		&svcsdk.DescribeLifecycleConfigurationInput{
 			FileSystemId: r.Status.FileSystemID,
@@ -206,9 +211,9 @@ func (rm *resourceManager) getLifecyclePolicies(ctx context.Context, r *svcapity
 
 	for _, lp := range output.LifecyclePolicies {
 		lps = append(lps, &svcapitypes.LifecyclePolicy{
-			TransitionToArchive:             lp.TransitionToArchive,
-			TransitionToIA:                  lp.TransitionToIA,
-			TransitionToPrimaryStorageClass: lp.TransitionToPrimaryStorageClass,
+			TransitionToArchive:             aws.String(string(lp.TransitionToArchive)),
+			TransitionToIA:                  aws.String(string(lp.TransitionToIA)),
+			TransitionToPrimaryStorageClass: aws.String(string(lp.TransitionToPrimaryStorageClass)),
 		})
 	}
 
@@ -220,7 +225,7 @@ func (rm *resourceManager) syncPolicy(ctx context.Context, r *resource) (err err
 	exit := rlog.Trace("rm.syncPolicy")
 	defer func() { exit(err) }()
 
-	_, err = rm.sdkapi.PutFileSystemPolicyWithContext(
+	_, err = rm.sdkapi.PutFileSystemPolicy(
 		ctx,
 		&svcsdk.PutFileSystemPolicyInput{
 			FileSystemId: r.ko.Status.FileSystemID,
@@ -237,12 +242,12 @@ func (rm *resourceManager) syncBackupPolicy(ctx context.Context, r *resource) (e
 	exit := rlog.Trace("rm.syncBackupPolicy")
 	defer func() { exit(err) }()
 
-	_, err = rm.sdkapi.PutBackupPolicyWithContext(
+	_, err = rm.sdkapi.PutBackupPolicy(
 		ctx,
 		&svcsdk.PutBackupPolicyInput{
 			FileSystemId: r.ko.Status.FileSystemID,
-			BackupPolicy: &svcsdk.BackupPolicy{
-				Status: r.ko.Spec.BackupPolicy.Status,
+			BackupPolicy: &svcsdktypes.BackupPolicy{
+				Status: svcsdktypes.Status(*r.ko.Spec.BackupPolicy.Status),
 			},
 		},
 	)
@@ -254,23 +259,46 @@ func (rm *resourceManager) syncLifecyclePolicies(ctx context.Context, r *resourc
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.syncLifecyclePolicies")
 	defer func() { exit(err) }()
-
-	lps := []*svcsdk.LifecyclePolicy{}
-	for _, lp := range r.ko.Spec.LifecyclePolicies {
-		lps = append(lps, &svcsdk.LifecyclePolicy{
-			TransitionToArchive:             lp.TransitionToArchive,
-			TransitionToIA:                  lp.TransitionToIA,
-			TransitionToPrimaryStorageClass: lp.TransitionToPrimaryStorageClass,
-		})
+	// Check if LifecyclePolicies is nil or empty
+	if len(r.ko.Spec.LifecyclePolicies) == 0 {
+		rlog.Debug("No LifecyclePolicies specified, skipping sync")
+		return nil
 	}
-
-	_, err = rm.sdkapi.PutLifecycleConfigurationWithContext(
+	// Check if FileSystemID is nil
+	if r.ko.Status.FileSystemID == nil {
+		err = fmt.Errorf("FileSystemID is nil, cannot sync lifecycle policies")
+		rlog.Info("FileSystemID is missing", "error", err)
+		return err
+	}
+	// Build LifecyclePolicy list
+	lps := []svcsdktypes.LifecyclePolicy{}
+	for _, lp := range r.ko.Spec.LifecyclePolicies {
+		l := svcsdktypes.LifecyclePolicy{}
+		if lp.TransitionToArchive != nil {
+			l.TransitionToArchive = svcsdktypes.TransitionToArchiveRules(*lp.TransitionToArchive)
+		}
+		if lp.TransitionToIA != nil {
+			l.TransitionToIA = svcsdktypes.TransitionToIARules(*lp.TransitionToIA)
+		}
+		if lp.TransitionToPrimaryStorageClass != nil {
+			l.TransitionToPrimaryStorageClass = svcsdktypes.TransitionToPrimaryStorageClassRules(*lp.TransitionToPrimaryStorageClass)
+		}
+		lps = append(lps, l)
+	}
+	// Log the API call payload for traceability
+	rlog.Debug("Calling PutLifecycleConfiguration", "FileSystemID", *r.ko.Status.FileSystemID, "LifecyclePolicies", lps)
+	// Make API call to update lifecycle policies
+	_, err = rm.sdkapi.PutLifecycleConfiguration(
 		ctx,
 		&svcsdk.PutLifecycleConfigurationInput{
 			FileSystemId:      r.ko.Status.FileSystemID,
 			LifecyclePolicies: lps,
 		},
 	)
+	if err != nil {
+		err = fmt.Errorf("failed to sync lifecycle policies for FileSystemID '%s': %w", *r.ko.Status.FileSystemID, err)
+		rlog.Info("PutLifecycleConfiguration API call failed", "error", err)
+	}
 	rm.metrics.RecordAPICall("UPDATE", "PutLifecycleConfiguration", err)
 	return err
 }
@@ -280,11 +308,11 @@ func (rm *resourceManager) syncFilesystemProtection(ctx context.Context, r *reso
 	exit := rlog.Trace("rm.syncFilesystemProtection")
 	defer func() { exit(err) }()
 
-	_, err = rm.sdkapi.UpdateFileSystemProtectionWithContext(
+	_, err = rm.sdkapi.UpdateFileSystemProtection(
 		ctx,
 		&svcsdk.UpdateFileSystemProtectionInput{
 			FileSystemId:                   r.ko.Status.FileSystemID,
-			ReplicationOverwriteProtection: r.ko.Spec.FileSystemProtection.ReplicationOverwriteProtection,
+			ReplicationOverwriteProtection: svcsdktypes.ReplicationOverwriteProtection(*r.ko.Spec.FileSystemProtection.ReplicationOverwriteProtection),
 		},
 	)
 	rm.metrics.RecordAPICall("UPDATE", "UpdateFileSystemProtection", err)
