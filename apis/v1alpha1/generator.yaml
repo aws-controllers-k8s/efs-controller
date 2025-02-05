@@ -6,7 +6,10 @@ ignore:
       - ReplicationConfiguration
   field_paths:
   - CreateFileSystemInput.CreationToken
+  - UpdateFileSystemOutput.CreationToken
   - FileSystemDescription.CreationToken
+  - DescribeFileSystemsInput.CreationToken
+  - CreateFileSystemOutput.CreationToken
   - PutBackupPolicyInput.FileSystemId
   - PutLifecycleConfigurationInput.FileSystemId
   - PutFileSystemPolicyInput.FileSystemId

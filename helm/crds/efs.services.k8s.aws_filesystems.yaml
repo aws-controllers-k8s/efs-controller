@@ -75,10 +75,10 @@ spec:
             properties:
               availabilityZoneName:
                 description: |-
-                  Used to create a One Zone file system. It specifies the Amazon Web Services
-                  Availability Zone in which to create the file system. Use the format us-east-1a
-                  to specify the Availability Zone. For more information about One Zone file
-                  systems, see Using EFS storage classes (https://docs.aws.amazon.com/efs/latest/ug/storage-classes.html)
+                  For One Zone file systems, specify the Amazon Web Services Availability Zone
+                  in which to create the file system. Use the format us-east-1a to specify
+                  the Availability Zone. For more information about One Zone file systems,
+                  see EFS file system types (https://docs.aws.amazon.com/efs/latest/ug/availability-durability.html#file-system-type)
                   in the Amazon EFS User Guide.
 
                   One Zone file systems are not available in all Availability Zones in Amazon
@@ -159,8 +159,8 @@ spec:
               lifecyclePolicies:
                 description: |-
                   An array of LifecyclePolicy objects that define the file system's LifecycleConfiguration
-                  object. A LifecycleConfiguration object informs EFS Lifecycle management
-                  of the following:
+                  object. A LifecycleConfiguration object informs lifecycle management of the
+                  following:
 
                     - TransitionToIA – When to move files in the file system from primary
                       storage (Standard storage class) into the Infrequent Access (IA) storage.
@@ -170,8 +170,8 @@ spec:
                       storage. File systems cannot transition into Archive storage before transitioning
                       into IA storage. Therefore, TransitionToArchive must either not be set
                       or must be later than TransitionToIA. The Archive storage class is available
-                      only for file systems that use the Elastic Throughput mode and the General
-                      Purpose Performance mode.
+                      only for file systems that use the Elastic throughput mode and the General
+                      Purpose performance mode.
 
                     - TransitionToPrimaryStorageClass – Whether to move files in the file
                       system back to primary storage (Standard storage class) after they are
@@ -185,7 +185,7 @@ spec:
                   for more information.
                 items:
                   description: |-
-                    Describes a policy used by Lifecycle management that specifies when to transition
+                    Describes a policy used by lifecycle management that specifies when to transition
                     files into and out of storage classes. For more information, see Managing
                     file system storage (https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html).
 
@@ -205,7 +205,7 @@ spec:
                 type: array
               performanceMode:
                 description: |-
-                  The Performance mode of the file system. We recommend generalPurpose performance
+                  The performance mode of the file system. We recommend generalPurpose performance
                   mode for all file systems. File systems using the maxIO performance mode
                   can scale to higher levels of aggregate throughput and operations per second
                   with a tradeoff of slightly higher latencies for most file operations. The
@@ -221,8 +221,8 @@ spec:
                 description: |-
                   The FileSystemPolicy that you're creating. Accepts a JSON formatted policy
                   definition. EFS file system policies have a 20,000 character limit. To find
-                  out more about the elements that make up a file system policy, see EFS Resource-based
-                  Policies (https://docs.aws.amazon.com/efs/latest/ug/access-control-overview.html#access-control-manage-access-intro-resource-policies).
+                  out more about the elements that make up a file system policy, see Resource-based
+                  policies within Amazon EFS (https://docs.aws.amazon.com/efs/latest/ug/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies).
                 type: string
               provisionedThroughputInMiBps:
                 description: |-

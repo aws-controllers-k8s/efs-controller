@@ -24,7 +24,7 @@ import (
 	"github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
@@ -62,7 +62,8 @@ func accessPointActive(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	return cs == string(svcapitypes.LifeCycleState_available)
+	lifeCycleState := string(svcapitypes.LifeCycleState_available)
+	return cs == lifeCycleState
 }
 
 // customUpdateAccessPoint updates the access point

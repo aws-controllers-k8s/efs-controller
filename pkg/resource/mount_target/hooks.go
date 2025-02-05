@@ -21,7 +21,7 @@ import (
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
-	svcsdk "github.com/aws/aws-sdk-go/service/efs"
+	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 )
@@ -56,7 +56,8 @@ func mountTargetActive(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	return cs == string(svcapitypes.LifeCycleState_available)
+	lifeCycleState := string(svcapitypes.LifeCycleState_available)
+	return cs == lifeCycleState
 }
 
 // mounttargetCreating returns true if the supplied mounttarget is in the process of
@@ -66,32 +67,40 @@ func mountTargetCreating(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	return cs == string(svcapitypes.LifeCycleState_creating)
+	lifeCycleState := string(svcapitypes.LifeCycleState_creating)
+	return cs == lifeCycleState
 }
 
 // setResourceDefaults queries the EFS API for the current state of the
 // fields that are not returned by the ReadOne or List APIs.
-func (rm *resourceManager) setResourceAdditionalFields(ctx context.Context, r *svcapitypes.MountTarget) (err error) {
+func (rm *resourceManager) setResourceAdditionalFields(ctx context.Context, r *svcapitypes.MountTarget) error {
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.setResourceAdditionalFields")
-	defer func() { exit(err) }()
+	defer exit(nil)
 
-	r.Spec.SecurityGroups, err = rm.getSecurityGroups(ctx, r)
+	securityGroups, err := rm.getSecurityGroups(ctx, r)
 	if err != nil {
+		exit(err)
 		return err
+	}
+
+	r.Spec.SecurityGroups = make([]*string, len(securityGroups))
+	for i := range securityGroups {
+		securityGroup := securityGroups[i]
+		r.Spec.SecurityGroups[i] = &securityGroup
 	}
 
 	return nil
 }
 
 // getSecurityGroups returns the security groups for the mount target
-func (rm *resourceManager) getSecurityGroups(ctx context.Context, r *svcapitypes.MountTarget) (_ []*string, err error) {
+func (rm *resourceManager) getSecurityGroups(ctx context.Context, r *svcapitypes.MountTarget) (_ []string, err error) {
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.getSecurityGroups")
 	defer func() { exit(err) }()
 
 	var output *svcsdk.DescribeMountTargetSecurityGroupsOutput
-	output, err = rm.sdkapi.DescribeMountTargetSecurityGroupsWithContext(
+	output, err = rm.sdkapi.DescribeMountTargetSecurityGroups(
 		ctx,
 		&svcsdk.DescribeMountTargetSecurityGroupsInput{
 			MountTargetId: r.Status.MountTargetID,
@@ -111,11 +120,16 @@ func (rm *resourceManager) putSecurityGroups(ctx context.Context, r *resource) (
 	exit := rlog.Trace("rm.syncPolicy")
 	defer func() { exit(err) }()
 
-	_, err = rm.sdkapi.ModifyMountTargetSecurityGroupsWithContext(
+	securityGroups := make([]string, 0, len(r.ko.Spec.SecurityGroups))
+	for _, sg := range r.ko.Spec.SecurityGroups {
+		securityGroups = append(securityGroups, *sg)
+	}
+
+	_, err = rm.sdkapi.ModifyMountTargetSecurityGroups(
 		ctx,
 		&svcsdk.ModifyMountTargetSecurityGroupsInput{
 			MountTargetId:  r.ko.Status.MountTargetID,
-			SecurityGroups: r.ko.Spec.SecurityGroups,
+			SecurityGroups: securityGroups,
 		},
 	)
 	rm.metrics.RecordAPICall("UPDATE", "ModifyMountTargetSecurityGroups", err)
