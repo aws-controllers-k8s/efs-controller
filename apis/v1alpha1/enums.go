@@ -18,7 +18,7 @@ package v1alpha1
 type DeletionMode string
 
 const (
-	DeletionMode_ALL_CONFIGURATIONS DeletionMode = "ALL_CONFIGURATIONS"
+	DeletionMode_ALL_CONFIGURATIONS       DeletionMode = "ALL_CONFIGURATIONS"
 	DeletionMode_LOCAL_CONFIGURATION_ONLY DeletionMode = "LOCAL_CONFIGURATION_ONLY"
 )
 
@@ -26,25 +26,25 @@ type LifeCycleState string
 
 const (
 	LifeCycleState_available LifeCycleState = "available"
-	LifeCycleState_creating LifeCycleState = "creating"
-	LifeCycleState_deleted LifeCycleState = "deleted"
-	LifeCycleState_deleting LifeCycleState = "deleting"
-	LifeCycleState_error LifeCycleState = "error"
-	LifeCycleState_updating LifeCycleState = "updating"
+	LifeCycleState_creating  LifeCycleState = "creating"
+	LifeCycleState_deleted   LifeCycleState = "deleted"
+	LifeCycleState_deleting  LifeCycleState = "deleting"
+	LifeCycleState_error     LifeCycleState = "error"
+	LifeCycleState_updating  LifeCycleState = "updating"
 )
 
 type PerformanceMode string
 
 const (
 	PerformanceMode_generalPurpose PerformanceMode = "generalPurpose"
-	PerformanceMode_maxIO PerformanceMode = "maxIO"
+	PerformanceMode_maxIO          PerformanceMode = "maxIO"
 )
 
 type ReplicationOverwriteProtection string
 
 const (
-	ReplicationOverwriteProtection_DISABLED ReplicationOverwriteProtection = "DISABLED"
-	ReplicationOverwriteProtection_ENABLED ReplicationOverwriteProtection = "ENABLED"
+	ReplicationOverwriteProtection_DISABLED    ReplicationOverwriteProtection = "DISABLED"
+	ReplicationOverwriteProtection_ENABLED     ReplicationOverwriteProtection = "ENABLED"
 	ReplicationOverwriteProtection_REPLICATING ReplicationOverwriteProtection = "REPLICATING"
 )
 
@@ -52,70 +52,70 @@ type ReplicationStatus string
 
 const (
 	ReplicationStatus_DELETING ReplicationStatus = "DELETING"
-	ReplicationStatus_ENABLED ReplicationStatus = "ENABLED"
+	ReplicationStatus_ENABLED  ReplicationStatus = "ENABLED"
 	ReplicationStatus_ENABLING ReplicationStatus = "ENABLING"
-	ReplicationStatus_ERROR ReplicationStatus = "ERROR"
-	ReplicationStatus_PAUSED ReplicationStatus = "PAUSED"
-	ReplicationStatus_PAUSING ReplicationStatus = "PAUSING"
+	ReplicationStatus_ERROR    ReplicationStatus = "ERROR"
+	ReplicationStatus_PAUSED   ReplicationStatus = "PAUSED"
+	ReplicationStatus_PAUSING  ReplicationStatus = "PAUSING"
 )
 
 type Resource string
 
 const (
-	Resource_FILE_SYSTEM Resource = "FILE_SYSTEM"
+	Resource_FILE_SYSTEM  Resource = "FILE_SYSTEM"
 	Resource_MOUNT_TARGET Resource = "MOUNT_TARGET"
 )
 
 type ResourceIDType string
 
 const (
-	ResourceIDType_LONG_ID ResourceIDType = "LONG_ID"
+	ResourceIDType_LONG_ID  ResourceIDType = "LONG_ID"
 	ResourceIDType_SHORT_ID ResourceIDType = "SHORT_ID"
 )
 
 type Status string
 
 const (
-	Status_DISABLED Status = "DISABLED"
+	Status_DISABLED  Status = "DISABLED"
 	Status_DISABLING Status = "DISABLING"
-	Status_ENABLED Status = "ENABLED"
-	Status_ENABLING Status = "ENABLING"
+	Status_ENABLED   Status = "ENABLED"
+	Status_ENABLING  Status = "ENABLING"
 )
 
 type ThroughputMode string
 
 const (
-	ThroughputMode_bursting ThroughputMode = "bursting"
-	ThroughputMode_elastic ThroughputMode = "elastic"
+	ThroughputMode_bursting    ThroughputMode = "bursting"
+	ThroughputMode_elastic     ThroughputMode = "elastic"
 	ThroughputMode_provisioned ThroughputMode = "provisioned"
 )
 
 type TransitionToArchiveRules string
 
 const (
-	TransitionToArchiveRules_AFTER_14_DAYS TransitionToArchiveRules = "AFTER_14_DAYS"
+	TransitionToArchiveRules_AFTER_14_DAYS  TransitionToArchiveRules = "AFTER_14_DAYS"
 	TransitionToArchiveRules_AFTER_180_DAYS TransitionToArchiveRules = "AFTER_180_DAYS"
-	TransitionToArchiveRules_AFTER_1_DAY TransitionToArchiveRules = "AFTER_1_DAY"
+	TransitionToArchiveRules_AFTER_1_DAY    TransitionToArchiveRules = "AFTER_1_DAY"
 	TransitionToArchiveRules_AFTER_270_DAYS TransitionToArchiveRules = "AFTER_270_DAYS"
-	TransitionToArchiveRules_AFTER_30_DAYS TransitionToArchiveRules = "AFTER_30_DAYS"
+	TransitionToArchiveRules_AFTER_30_DAYS  TransitionToArchiveRules = "AFTER_30_DAYS"
 	TransitionToArchiveRules_AFTER_365_DAYS TransitionToArchiveRules = "AFTER_365_DAYS"
-	TransitionToArchiveRules_AFTER_60_DAYS TransitionToArchiveRules = "AFTER_60_DAYS"
-	TransitionToArchiveRules_AFTER_7_DAYS TransitionToArchiveRules = "AFTER_7_DAYS"
-	TransitionToArchiveRules_AFTER_90_DAYS TransitionToArchiveRules = "AFTER_90_DAYS"
+	TransitionToArchiveRules_AFTER_60_DAYS  TransitionToArchiveRules = "AFTER_60_DAYS"
+	TransitionToArchiveRules_AFTER_7_DAYS   TransitionToArchiveRules = "AFTER_7_DAYS"
+	TransitionToArchiveRules_AFTER_90_DAYS  TransitionToArchiveRules = "AFTER_90_DAYS"
 )
 
 type TransitionToIARules string
 
 const (
-	TransitionToIARules_AFTER_14_DAYS TransitionToIARules = "AFTER_14_DAYS"
+	TransitionToIARules_AFTER_14_DAYS  TransitionToIARules = "AFTER_14_DAYS"
 	TransitionToIARules_AFTER_180_DAYS TransitionToIARules = "AFTER_180_DAYS"
-	TransitionToIARules_AFTER_1_DAY TransitionToIARules = "AFTER_1_DAY"
+	TransitionToIARules_AFTER_1_DAY    TransitionToIARules = "AFTER_1_DAY"
 	TransitionToIARules_AFTER_270_DAYS TransitionToIARules = "AFTER_270_DAYS"
-	TransitionToIARules_AFTER_30_DAYS TransitionToIARules = "AFTER_30_DAYS"
+	TransitionToIARules_AFTER_30_DAYS  TransitionToIARules = "AFTER_30_DAYS"
 	TransitionToIARules_AFTER_365_DAYS TransitionToIARules = "AFTER_365_DAYS"
-	TransitionToIARules_AFTER_60_DAYS TransitionToIARules = "AFTER_60_DAYS"
-	TransitionToIARules_AFTER_7_DAYS TransitionToIARules = "AFTER_7_DAYS"
-	TransitionToIARules_AFTER_90_DAYS TransitionToIARules = "AFTER_90_DAYS"
+	TransitionToIARules_AFTER_60_DAYS  TransitionToIARules = "AFTER_60_DAYS"
+	TransitionToIARules_AFTER_7_DAYS   TransitionToIARules = "AFTER_7_DAYS"
+	TransitionToIARules_AFTER_90_DAYS  TransitionToIARules = "AFTER_90_DAYS"
 )
 
 type TransitionToPrimaryStorageClassRules string
