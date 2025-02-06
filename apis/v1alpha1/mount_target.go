@@ -23,19 +23,19 @@ import (
 // MountTargetSpec defines the desired state of MountTarget.
 type MountTargetSpec struct {
 
-// The ID of the file system for which to create the mount target.
-FileSystemID *string `json:"fileSystemID,omitempty"`
-FileSystemRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"fileSystemRef,omitempty"`
-// Valid IPv4 address within the address range of the specified subnet.
-IPAddress *string `json:"ipAddress,omitempty"`
-SecurityGroupRefs []*ackv1alpha1.AWSResourceReferenceWrapper `json:"securityGroupRefs,omitempty"`
-// Up to five VPC security group IDs, of the form sg-xxxxxxxx. These must be
-// for the same VPC as subnet specified.
-SecurityGroups []*string `json:"securityGroups,omitempty"`
-// The ID of the subnet to add the mount target in. For One Zone file systems,
-// use the subnet that is associated with the file system's Availability Zone.
-SubnetID *string `json:"subnetID,omitempty"`
-SubnetRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"subnetRef,omitempty"`
+	// The ID of the file system for which to create the mount target.
+	FileSystemID  *string                                  `json:"fileSystemID,omitempty"`
+	FileSystemRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"fileSystemRef,omitempty"`
+	// Valid IPv4 address within the address range of the specified subnet.
+	IPAddress         *string                                    `json:"ipAddress,omitempty"`
+	SecurityGroupRefs []*ackv1alpha1.AWSResourceReferenceWrapper `json:"securityGroupRefs,omitempty"`
+	// Up to five VPC security group IDs, of the form sg-xxxxxxxx. These must be
+	// for the same VPC as subnet specified.
+	SecurityGroups []*string `json:"securityGroups,omitempty"`
+	// The ID of the subnet to add the mount target in. For One Zone file systems,
+	// use the subnet that is associated with the file system's Availability Zone.
+	SubnetID  *string                                  `json:"subnetID,omitempty"`
+	SubnetRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"subnetRef,omitempty"`
 }
 
 // MountTargetStatus defines the observed state of MountTarget
@@ -52,15 +52,15 @@ type MountTargetStatus struct {
 	// +kubebuilder:validation:Optional
 	Conditions []*ackv1alpha1.Condition `json:"conditions"`
 	// The unique and consistent identifier of the Availability Zone that the mount
-// target resides in. For example, use1-az1 is an AZ ID for the us-east-1 Region
-// and it has the same location in every Amazon Web Services account.
+	// target resides in. For example, use1-az1 is an AZ ID for the us-east-1 Region
+	// and it has the same location in every Amazon Web Services account.
 	// +kubebuilder:validation:Optional
 	AvailabilityZoneID *string `json:"availabilityZoneID,omitempty"`
 	// The name of the Availability Zone in which the mount target is located. Availability
-// Zones are independently mapped to names for each Amazon Web Services account.
-// For example, the Availability Zone us-east-1a for your Amazon Web Services
-// account might not be the same location as us-east-1a for another Amazon Web
-// Services account.
+	// Zones are independently mapped to names for each Amazon Web Services account.
+	// For example, the Availability Zone us-east-1a for your Amazon Web Services
+	// account might not be the same location as us-east-1a for another Amazon Web
+	// Services account.
 	// +kubebuilder:validation:Optional
 	AvailabilityZoneName *string `json:"availabilityZoneName,omitempty"`
 	// Lifecycle state of the mount target.
@@ -70,7 +70,7 @@ type MountTargetStatus struct {
 	// +kubebuilder:validation:Optional
 	MountTargetID *string `json:"mountTargetID,omitempty"`
 	// The ID of the network interface that Amazon EFS created when it created the
-// mount target.
+	// mount target.
 	// +kubebuilder:validation:Optional
 	NetworkInterfaceID *string `json:"networkInterfaceID,omitempty"`
 	// Amazon Web Services account ID that owns the resource.
@@ -97,8 +97,8 @@ type MountTargetStatus struct {
 type MountTarget struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec   MountTargetSpec   `json:"spec,omitempty"`
-	Status MountTargetStatus `json:"status,omitempty"`
+	Spec              MountTargetSpec   `json:"spec,omitempty"`
+	Status            MountTargetStatus `json:"status,omitempty"`
 }
 
 // MountTargetList contains a list of MountTarget
@@ -106,7 +106,7 @@ type MountTarget struct {
 type MountTargetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items []MountTarget `json:"items"`
+	Items           []MountTarget `json:"items"`
 }
 
 func init() {
