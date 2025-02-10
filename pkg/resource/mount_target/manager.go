@@ -102,6 +102,7 @@ func (rm *resourceManager) ReadOne(
 		panic("resource manager's ReadOne() method received resource with nil CR object")
 	}
 	observed, err := rm.sdkFind(ctx, r)
+	filterAWSTags(observed)
 	if err != nil {
 		if observed != nil {
 			return rm.onError(observed, err)
@@ -284,6 +285,16 @@ func (rm *resourceManager) EnsureTags(
 ) error {
 
 	return nil
+}
+
+// filterAWSTags ignores tags that have keys that start with "aws:"
+// is needed to ensure the controller does not attempt to remove
+// tags set by AWS. This function needs to be called after each Read
+// operation.
+// Eg. resources created with cloudformation have tags that cannot be
+// removed by an ACK controller
+func filterAWSTags(r *resource) {
+
 }
 
 // newResourceManager returns a new struct implementing

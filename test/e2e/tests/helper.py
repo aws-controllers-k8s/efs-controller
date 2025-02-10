@@ -93,3 +93,10 @@ class EFSValidator:
         
     def access_point_exists(self, access_point_id) -> bool:
         return self.get_access_point(access_point_id) is not None
+    
+    def list_tags_for_resource(self, resource_id) -> list:
+        try:
+            resp = self.efs_client.list_tags_for_resource(ResourceId=resource_id)
+            return resp["Tags"]
+        except Exception as e:
+            return None

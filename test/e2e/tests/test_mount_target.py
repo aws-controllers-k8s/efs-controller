@@ -34,7 +34,7 @@ CREATE_WAIT_AFTER_SECONDS = 100
 UPDATE_WAIT_AFTER_SECONDS = 15
 DELETE_WAIT_AFTER_SECONDS = 30
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def simple_mount_target(efs_client, simple_file_system):
     (_, cr, file_system_id) = simple_file_system
 

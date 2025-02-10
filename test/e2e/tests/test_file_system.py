@@ -36,7 +36,7 @@ DELETE_WAIT_AFTER_SECONDS = 15
 def efs_policy_from_id(id: str):
     return "{\"Version\":\"2008-10-17\",\"Id\":\"1\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::637423241197:root\"},\"Action\":\"elasticfilesystem:ClientMount\",\"Resource\":\"arn:aws:elasticfilesystem:us-west-2:637423241197:file-system/FSID\"}]}".replace("FSID", id)
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def simple_file_system(efs_client):
     resource_name = random_suffix_name("efs", 24)
 
@@ -68,6 +68,57 @@ def simple_file_system(efs_client):
 
     assert cr is not None
     assert 'status' in cr
+    assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=15)
+    assert 'fileSystemID' in cr['status']
+    file_system_id = cr['status']['fileSystemID']
+
+    yield (ref, cr, file_system_id)
+
+    _, deleted = k8s.delete_custom_resource(
+        ref,
+        period_length=DELETE_WAIT_AFTER_SECONDS,
+    )
+    assert deleted
+
+    time.sleep(DELETE_WAIT_AFTER_SECONDS)
+
+    validator = EFSValidator(efs_client)
+    assert not validator.file_system_exists(file_system_id)
+
+
+@pytest.fixture(scope="function")
+def backup_file_system(efs_client):
+    resource_name = random_suffix_name("efs", 24)
+
+    resources = get_bootstrap_resources()
+    logging.debug(resources)
+
+    replacements = REPLACEMENT_VALUES.copy()
+    replacements["FILE_SYSTEM_NAME"] = resource_name
+
+    # Load efs CR
+    resource_data = load_efs_resource(
+        "file_system_backup",
+        additional_replacements=replacements,
+    )
+    logging.debug(resource_data)
+
+    # Create k8s resource
+    ref = k8s.CustomResourceReference(
+        CRD_GROUP, CRD_VERSION, RESOURCE_PLURAL,
+        resource_name, namespace="default",
+    )
+    k8s.create_custom_resource(ref, resource_data)
+
+    time.sleep(CREATE_WAIT_AFTER_SECONDS)
+    cr = k8s.wait_resource_consumed_by_controller(ref)
+
+    assert cr is not None
+    assert k8s.get_resource_exists(ref)
+
+    assert cr is not None
+    assert 'status' in cr
+    assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=15)
     assert 'fileSystemID' in cr['status']
     file_system_id = cr['status']['fileSystemID']
 
@@ -139,12 +190,24 @@ class TestFileSystem:
         observedPolicy = validator.get_file_system_policy(file_system_id)
         assert json.loads(policy) == json.loads(observedPolicy)
 
-    def test_update_backup_policy(self, efs_client, simple_file_system):
-        (ref, _, file_system_id) = simple_file_system
+    def test_update_backup_policy(self, efs_client, backup_file_system):
+        (ref, _, file_system_id) = backup_file_system
         assert file_system_id is not None
 
         validator = EFSValidator(efs_client)
         assert validator.file_system_exists(file_system_id)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=15)
+        tags = validator.list_tags_for_resource(file_system_id)
+        logging.error("tags: "+str(tags))
+
+        assert tags is not None
+        assert len(tags) > 0
+
+        foundAWSTag = False
+        for t in tags:
+            if t["Key"].startswith("aws:"):
+                foundAWSTag = True
+        assert foundAWSTag
 
         updates = {
             "spec": {

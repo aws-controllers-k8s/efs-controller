@@ -8,3 +8,4 @@ spec:
     replicationOverwriteProtection: ENABLED
   performanceMode: generalPurpose
   throughputMode: bursting
+  backup: true
