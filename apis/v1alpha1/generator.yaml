@@ -26,6 +26,11 @@ controller_name: efs
 resources:
   FileSystem:
     fields:
+      Backup:
+        compare:
+          is_ignored: true
+        set:
+        - ignore: all
       KMSKeyID:
         references:
           resource: Key
@@ -61,6 +66,8 @@ resources:
         template_path: hooks/file_system/sdk_read_many_post_set_output.go.tpl
       sdk_update_pre_build_request:
         template_path: hooks/file_system/sdk_update_pre_build_request.go.tpl
+      sdk_read_many_pre_build_request:
+        template_path: hooks/file_system/sdk_read_many_pre_build_request.go.tpl
     print:
       add_age_column: true
       add_synced_column: true

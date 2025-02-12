@@ -63,6 +63,10 @@ func (rm *resourceManager) sdkFind(
 	defer func() {
 		exit(err)
 	}()
+	if r.ko.Spec.Backup != nil {
+		msg := fmt.Errorf("field Backup is a NO-OP field. Set BackupPolicy.Status instead")
+		return nil, ackerr.NewTerminalError(msg)
+	}
 	// If any required fields in the input shape are missing, AWS resource is
 	// not created yet. Return NotFound here to indicate to callers that the
 	// resource isn't yet created.
@@ -413,9 +417,6 @@ func (rm *resourceManager) newCreateRequestPayload(
 
 	if r.ko.Spec.AvailabilityZoneName != nil {
 		res.AvailabilityZoneName = r.ko.Spec.AvailabilityZoneName
-	}
-	if r.ko.Spec.Backup != nil {
-		res.Backup = r.ko.Spec.Backup
 	}
 	if r.ko.Spec.Encrypted != nil {
 		res.Encrypted = r.ko.Spec.Encrypted

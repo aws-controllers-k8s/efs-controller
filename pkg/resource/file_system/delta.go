@@ -51,13 +51,6 @@ func newResourceDelta(
 			delta.Add("Spec.AvailabilityZoneName", a.ko.Spec.AvailabilityZoneName, b.ko.Spec.AvailabilityZoneName)
 		}
 	}
-	if ackcompare.HasNilDifference(a.ko.Spec.Backup, b.ko.Spec.Backup) {
-		delta.Add("Spec.Backup", a.ko.Spec.Backup, b.ko.Spec.Backup)
-	} else if a.ko.Spec.Backup != nil && b.ko.Spec.Backup != nil {
-		if *a.ko.Spec.Backup != *b.ko.Spec.Backup {
-			delta.Add("Spec.Backup", a.ko.Spec.Backup, b.ko.Spec.Backup)
-		}
-	}
 	if ackcompare.HasNilDifference(a.ko.Spec.BackupPolicy, b.ko.Spec.BackupPolicy) {
 		delta.Add("Spec.BackupPolicy", a.ko.Spec.BackupPolicy, b.ko.Spec.BackupPolicy)
 	} else if a.ko.Spec.BackupPolicy != nil && b.ko.Spec.BackupPolicy != nil {
