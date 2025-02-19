@@ -17,11 +17,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
-	"github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -77,10 +75,6 @@ func (rm *resourceManager) customUpdateAccessPoint(
 	exit := rlog.Trace("rm.sdkUpdate")
 	defer func() { exit(err) }()
 
-	if immutableFieldChanges := rm.getImmutableFieldChanges(delta); len(immutableFieldChanges) > 0 {
-		msg := fmt.Sprintf("Immutable Spec fields have been modified: %s", strings.Join(immutableFieldChanges, ","))
-		return nil, errors.NewTerminalError(fmt.Errorf(msg))
-	}
 	if delta.DifferentAt("Spec.Tags") {
 		err := syncTags(
 			ctx, rm.sdkapi, rm.metrics,
