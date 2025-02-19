@@ -65,9 +65,10 @@ spec:
             description: AccessPointSpec defines the desired state of AccessPoint.
             properties:
               fileSystemID:
-                description: The ID of the EFS file system that the access point provides
-                  access to.
                 type: string
+                x-kubernetes-validations:
+                - message: Value is immutable once set
+                  rule: self == oldSelf
               fileSystemRef:
                 description: "AWSResourceReferenceWrapper provides a wrapper around
                   *AWSResourceReference\ntype to provide more user friendly syntax
@@ -87,8 +88,9 @@ spec:
                 type: object
               posixUser:
                 description: |-
-                  The operating system user and group applied to all file system requests made
-                  using the access point.
+                  The full POSIX identity, including the user ID, group ID, and any secondary
+                  group IDs, on the access point that is used for all file system operations
+                  performed by NFS clients using the access point.
                 properties:
                   gid:
                     format: int64
@@ -102,20 +104,16 @@ spec:
                     format: int64
                     type: integer
                 type: object
+                x-kubernetes-validations:
+                - message: Value is immutable once set
+                  rule: self == oldSelf
               rootDirectory:
                 description: |-
-                  Specifies the directory on the EFS file system that the access point exposes
-                  as the root directory of your file system to NFS clients using the access
-                  point. The clients using the access point can only access the root directory
-                  and below. If the RootDirectory > Path specified does not exist, Amazon EFS
-                  creates it and applies the CreationInfo settings when a client connects to
-                  an access point. When specifying a RootDirectory, you must provide the Path,
-                  and the CreationInfo.
-
-                  Amazon EFS creates a root directory only if you have provided the CreationInfo:
-                  OwnUid, OwnGID, and permissions for the directory. If you do not provide
-                  this information, Amazon EFS does not create the root directory. If the root
-                  directory does not exist, attempts to mount using the access point will fail.
+                  Specifies the directory on the Amazon EFS file system that the access point
+                  provides access to. The access point exposes the specified file system path
+                  as the root directory of your file system to applications using the access
+                  point. NFS clients using the access point can only access data in the access
+                  point's RootDirectory and its subdirectories.
                 properties:
                   creationInfo:
                     description: |-
@@ -145,12 +143,10 @@ spec:
                   path:
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: Value is immutable once set
+                  rule: self == oldSelf
               tags:
-                description: |-
-                  Creates tags associated with the access point. Each tag is a key-value pair,
-                  each key must be unique. For more information, see Tagging Amazon Web Services
-                  resources (https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html)
-                  in the Amazon Web Services General Reference Guide.
                 items:
                   description: |-
                     A tag is a key-value pair. Allowed characters are letters, white space, and
@@ -201,7 +197,7 @@ spec:
                 type: object
               conditions:
                 description: |-
-                  All CRS managed by ACK have a common `Status.Conditions` member that
+                  All CRs managed by ACK have a common `Status.Conditions` member that
                   contains a collection of `ackv1alpha1.Condition` objects that describe
                   the various terminal states of the CR and its backend AWS service API
                   resource

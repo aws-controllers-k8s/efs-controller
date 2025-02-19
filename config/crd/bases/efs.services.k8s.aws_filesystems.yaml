@@ -74,43 +74,19 @@ spec:
             description: FileSystemSpec defines the desired state of FileSystem.
             properties:
               availabilityZoneName:
-                description: |-
-                  For One Zone file systems, specify the Amazon Web Services Availability Zone
-                  in which to create the file system. Use the format us-east-1a to specify
-                  the Availability Zone. For more information about One Zone file systems,
-                  see EFS file system types (https://docs.aws.amazon.com/efs/latest/ug/availability-durability.html#file-system-type)
-                  in the Amazon EFS User Guide.
-
-                  One Zone file systems are not available in all Availability Zones in Amazon
-                  Web Services Regions where Amazon EFS is available.
                 type: string
               backup:
-                description: |-
-                  Specifies whether automatic backups are enabled on the file system that you
-                  are creating. Set the value to true to enable automatic backups. If you are
-                  creating a One Zone file system, automatic backups are enabled by default.
-                  For more information, see Automatic backups (https://docs.aws.amazon.com/efs/latest/ug/awsbackup.html#automatic-backups)
-                  in the Amazon EFS User Guide.
-
-                  Default is false. However, if you specify an AvailabilityZoneName, the default
-                  is true.
-
-                  Backup is not available in all Amazon Web Services Regions where Amazon EFS
-                  is available.
                 type: boolean
               backupPolicy:
-                description: The backup policy included in the PutBackupPolicy request.
+                description: |-
+                  The backup policy for the file system used to create automatic daily backups.
+                  If status has a value of ENABLED, the file system is being automatically
+                  backed up. For more information, see Automatic backups (https://docs.aws.amazon.com/efs/latest/ug/awsbackup.html#automatic-backups).
                 properties:
                   status:
                     type: string
                 type: object
               encrypted:
-                description: |-
-                  A Boolean value that, if true, creates an encrypted file system. When creating
-                  an encrypted file system, you have the option of specifying an existing Key
-                  Management Service key (KMS key). If you don't specify a KMS key, then the
-                  default KMS key for Amazon EFS, /aws/elasticfilesystem, is used to protect
-                  the encrypted file system.
                 type: boolean
               fileSystemProtection:
                 properties:
@@ -118,26 +94,6 @@ spec:
                     type: string
                 type: object
               kmsKeyID:
-                description: |-
-                  The ID of the KMS key that you want to use to protect the encrypted file
-                  system. This parameter is required only if you want to use a non-default
-                  KMS key. If this parameter is not specified, the default KMS key for Amazon
-                  EFS is used. You can specify a KMS key ID using the following formats:
-
-                     * Key ID - A unique identifier of the key, for example 1234abcd-12ab-34cd-56ef-1234567890ab.
-
-                     * ARN - An Amazon Resource Name (ARN) for the key, for example arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab.
-
-                     * Key alias - A previously created display name for a key, for example
-                     alias/projectKey1.
-
-                     * Key alias ARN - An ARN for a key alias, for example arn:aws:kms:us-west-2:444455556666:alias/projectKey1.
-
-                  If you use KmsKeyId, you must set the CreateFileSystemRequest$Encrypted parameter
-                  to true.
-
-                  EFS accepts only symmetric KMS keys. You cannot use asymmetric KMS keys with
-                  Amazon EFS file systems.
                 type: string
               kmsKeyRef:
                 description: "AWSResourceReferenceWrapper provides a wrapper around
@@ -157,32 +113,6 @@ spec:
                     type: object
                 type: object
               lifecyclePolicies:
-                description: |-
-                  An array of LifecyclePolicy objects that define the file system's LifecycleConfiguration
-                  object. A LifecycleConfiguration object informs lifecycle management of the
-                  following:
-
-                     * TransitionToIA – When to move files in the file system from primary
-                     storage (Standard storage class) into the Infrequent Access (IA) storage.
-
-                     * TransitionToArchive – When to move files in the file system from their
-                     current storage class (either IA or Standard storage) into the Archive
-                     storage. File systems cannot transition into Archive storage before transitioning
-                     into IA storage. Therefore, TransitionToArchive must either not be set
-                     or must be later than TransitionToIA. The Archive storage class is available
-                     only for file systems that use the Elastic throughput mode and the General
-                     Purpose performance mode.
-
-                     * TransitionToPrimaryStorageClass – Whether to move files in the file
-                     system back to primary storage (Standard storage class) after they are
-                     accessed in IA or Archive storage.
-
-                  When using the put-lifecycle-configuration CLI command or the PutLifecycleConfiguration
-                  API action, Amazon EFS requires that each LifecyclePolicy object have only
-                  a single transition. This means that in a request body, LifecyclePolicies
-                  must be structured as an array of LifecyclePolicy objects, one object for
-                  each storage transition. See the example requests in the following section
-                  for more information.
                 items:
                   description: |-
                     Describes a policy used by lifecycle management that specifies when to transition
@@ -204,43 +134,12 @@ spec:
                   type: object
                 type: array
               performanceMode:
-                description: |-
-                  The performance mode of the file system. We recommend generalPurpose performance
-                  mode for all file systems. File systems using the maxIO performance mode
-                  can scale to higher levels of aggregate throughput and operations per second
-                  with a tradeoff of slightly higher latencies for most file operations. The
-                  performance mode can't be changed after the file system has been created.
-                  The maxIO mode is not supported on One Zone file systems.
-
-                  Due to the higher per-operation latencies with Max I/O, we recommend using
-                  General Purpose performance mode for all file systems.
-
-                  Default is generalPurpose.
                 type: string
               policy:
-                description: |-
-                  The FileSystemPolicy that you're creating. Accepts a JSON formatted policy
-                  definition. EFS file system policies have a 20,000 character limit. To find
-                  out more about the elements that make up a file system policy, see Resource-based
-                  policies within Amazon EFS (https://docs.aws.amazon.com/efs/latest/ug/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies).
                 type: string
               provisionedThroughputInMiBps:
-                description: |-
-                  The throughput, measured in mebibytes per second (MiBps), that you want to
-                  provision for a file system that you're creating. Required if ThroughputMode
-                  is set to provisioned. Valid values are 1-3414 MiBps, with the upper limit
-                  depending on Region. To increase this limit, contact Amazon Web Services
-                  Support. For more information, see Amazon EFS quotas that you can increase
-                  (https://docs.aws.amazon.com/efs/latest/ug/limits.html#soft-limits) in the
-                  Amazon EFS User Guide.
                 type: number
               tags:
-                description: |-
-                  Use to create one or more tags associated with the file system. Each tag
-                  is a user-defined key-value pair. Name your file system on creation by including
-                  a "Key":"Name","Value":"{value}" key-value pair. Each key must be unique.
-                  For more information, see Tagging Amazon Web Services resources (https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html)
-                  in the Amazon Web Services General Reference Guide.
                 items:
                   description: |-
                     A tag is a key-value pair. Allowed characters are letters, white space, and
@@ -254,16 +153,6 @@ spec:
                   type: object
                 type: array
               throughputMode:
-                description: |-
-                  Specifies the throughput mode for the file system. The mode can be bursting,
-                  provisioned, or elastic. If you set ThroughputMode to provisioned, you must
-                  also set a value for ProvisionedThroughputInMibps. After you create the file
-                  system, you can decrease your file system's Provisioned throughput or change
-                  between the throughput modes, with certain time restrictions. For more information,
-                  see Specifying throughput with provisioned mode (https://docs.aws.amazon.com/efs/latest/ug/performance.html#provisioned-throughput)
-                  in the Amazon EFS User Guide.
-
-                  Default is bursting.
                 type: string
             type: object
           status:
@@ -308,7 +197,7 @@ spec:
                 type: string
               conditions:
                 description: |-
-                  All CRS managed by ACK have a common `Status.Conditions` member that
+                  All CRs managed by ACK have a common `Status.Conditions` member that
                   contains a collection of `ackv1alpha1.Condition` objects that describe
                   the various terminal states of the CR and its backend AWS service API
                   resource

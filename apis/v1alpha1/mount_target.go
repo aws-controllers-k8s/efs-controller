@@ -24,17 +24,24 @@ import (
 type MountTargetSpec struct {
 
 	// The ID of the file system for which to create the mount target.
-	FileSystemID  *string                                  `json:"fileSystemID,omitempty"`
+
+	FileSystemID *string `json:"fileSystemID,omitempty"`
+
 	FileSystemRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"fileSystemRef,omitempty"`
 	// Valid IPv4 address within the address range of the specified subnet.
-	IPAddress         *string                                    `json:"ipAddress,omitempty"`
+
+	IPAddress *string `json:"ipAddress,omitempty"`
+
 	SecurityGroupRefs []*ackv1alpha1.AWSResourceReferenceWrapper `json:"securityGroupRefs,omitempty"`
 	// Up to five VPC security group IDs, of the form sg-xxxxxxxx. These must be
 	// for the same VPC as subnet specified.
+
 	SecurityGroups []*string `json:"securityGroups,omitempty"`
 	// The ID of the subnet to add the mount target in. For One Zone file systems,
 	// use the subnet that is associated with the file system's Availability Zone.
-	SubnetID  *string                                  `json:"subnetID,omitempty"`
+
+	SubnetID *string `json:"subnetID,omitempty"`
+
 	SubnetRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"subnetRef,omitempty"`
 }
 
@@ -45,7 +52,7 @@ type MountTargetStatus struct {
 	// constructed ARN for the resource
 	// +kubebuilder:validation:Optional
 	ACKResourceMetadata *ackv1alpha1.ResourceMetadata `json:"ackResourceMetadata"`
-	// All CRS managed by ACK have a common `Status.Conditions` member that
+	// All CRs managed by ACK have a common `Status.Conditions` member that
 	// contains a collection of `ackv1alpha1.Condition` objects that describe
 	// the various terminal states of the CR and its backend AWS service API
 	// resource
