@@ -24,10 +24,12 @@ import (
 type AccessPointSpec struct {
 
 	// The ID of the EFS file system that the access point provides access to.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable once set"
 	FileSystemID  *string                                  `json:"fileSystemID,omitempty"`
 	FileSystemRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"fileSystemRef,omitempty"`
 	// The operating system user and group applied to all file system requests made
 	// using the access point.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable once set"
 	PosixUser *PosixUser `json:"posixUser,omitempty"`
 	// Specifies the directory on the EFS file system that the access point exposes
 	// as the root directory of your file system to NFS clients using the access
@@ -41,6 +43,7 @@ type AccessPointSpec struct {
 	// OwnUid, OwnGID, and permissions for the directory. If you do not provide
 	// this information, Amazon EFS does not create the root directory. If the root
 	// directory does not exist, attempts to mount using the access point will fail.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable once set"
 	RootDirectory *RootDirectory `json:"rootDirectory,omitempty"`
 	// Creates tags associated with the access point. Each tag is a key-value pair,
 	// each key must be unique. For more information, see Tagging Amazon Web Services
@@ -56,7 +59,7 @@ type AccessPointStatus struct {
 	// constructed ARN for the resource
 	// +kubebuilder:validation:Optional
 	ACKResourceMetadata *ackv1alpha1.ResourceMetadata `json:"ackResourceMetadata"`
-	// All CRS managed by ACK have a common `Status.Conditions` member that
+	// All CRs managed by ACK have a common `Status.Conditions` member that
 	// contains a collection of `ackv1alpha1.Condition` objects that describe
 	// the various terminal states of the CR and its backend AWS service API
 	// resource
