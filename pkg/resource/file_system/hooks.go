@@ -82,7 +82,7 @@ func filesystemActive(r *resource) bool {
 		return false
 	}
 	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcapitypes.LifeCycleState_available)
+	lifeCycleState := string(svcsdktypes.LifeCycleStateAvailable)
 	return cs == lifeCycleState
 }
 
