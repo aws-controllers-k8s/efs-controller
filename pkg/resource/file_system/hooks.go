@@ -242,12 +242,17 @@ func (rm *resourceManager) syncBackupPolicy(ctx context.Context, r *resource) (e
 	exit := rlog.Trace("rm.syncBackupPolicy")
 	defer func() { exit(err) }()
 
+	status := svcsdktypes.StatusDisabled
+	if r.ko.Spec.BackupPolicy != nil && r.ko.Spec.BackupPolicy.Status != nil {
+		status = svcsdktypes.Status(*r.ko.Spec.BackupPolicy.Status)
+	}
+
 	_, err = rm.sdkapi.PutBackupPolicy(
 		ctx,
 		&svcsdk.PutBackupPolicyInput{
 			FileSystemId: r.ko.Status.FileSystemID,
 			BackupPolicy: &svcsdktypes.BackupPolicy{
-				Status: svcsdktypes.Status(*r.ko.Spec.BackupPolicy.Status),
+				Status: status,
 			},
 		},
 	)
