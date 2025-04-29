@@ -20,6 +20,7 @@ import logging
 import json
 
 from acktest.resources import random_suffix_name
+from acktest import tags
 from acktest.k8s import resource as k8s
 
 from e2e import service_marker, CRD_GROUP, CRD_VERSION, load_efs_resource
@@ -180,3 +181,36 @@ class TestFileSystem:
         lfps = validator.get_file_system_lifecycle_policy(file_system_id)
         assert lfps is not None
         assert lfps[0]['TransitionToIA'] == "AFTER_30_DAYS"
+    
+    def test_update_tags(self, efs_client, simple_file_system):
+        (ref, _, file_system_id) = simple_file_system
+        assert file_system_id is not None
+
+        validator = EFSValidator(efs_client)
+        assert validator.file_system_exists(file_system_id)
+
+        desired_tags = [{
+            "key": "Name",
+            "value": "foobar"
+        }]
+        updates = {
+            "spec": {
+                "tags": desired_tags,
+            },
+        }
+        k8s.patch_custom_resource(ref, updates)
+        time.sleep(UPDATE_WAIT_AFTER_SECONDS)
+
+        fs = validator.get_file_system(file_system_id)
+        assert fs is not None
+        latest_tags = fs['FileSystems'][0]["Tags"]
+
+        tags.assert_ack_system_tags(
+            tags=latest_tags
+        )
+
+        desired_tags = [{"Key": d["key"], "Value": d["value"]} for d in desired_tags]
+        tags.assert_equal_without_ack_tags(
+            expected=desired_tags,
+            actual=latest_tags
+        )

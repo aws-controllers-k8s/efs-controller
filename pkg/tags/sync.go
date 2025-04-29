@@ -86,7 +86,7 @@ func SyncTags(
 		}
 	}
 
-	for k, _ := range existingTags {
+	for k := range existingTags {
 		if _, found := desiredTags[k]; !found {
 			deleteKey := k
 			toDelete = append(toDelete, deleteKey)
@@ -136,7 +136,7 @@ func addTags(
 	exit := rlog.Trace("rm.addTag")
 	defer func() { exit(err) }()
 
-	sdkTags := []svcsdktypes.Tag{}
+	sdkTags := toSdkTags(tags)
 	input := &svcsdk.TagResourceInput{
 		ResourceId: &resourceID,
 		Tags:       sdkTags,
@@ -165,4 +165,12 @@ func removeTags(
 	_, err = client.UntagResource(ctx, input)
 	mr.RecordAPICall("UPDATE", "UntagResource", err)
 	return err
+}
+
+func toSdkTags(tags map[string]*string) []svcsdktypes.Tag {
+	sdkTags := []svcsdktypes.Tag{}
+	for key, val := range tags {
+		sdkTags = append(sdkTags, svcsdktypes.Tag{Key: &key, Value: val})
+	}
+	return sdkTags
 }
