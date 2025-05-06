@@ -33,8 +33,7 @@ import (
 // getIdempotencyToken returns a unique string to be used in certain API calls
 // to ensure no replay of the call.
 func getIdempotencyToken() string {
-	t := time.Now().UTC()
-	return t.Format("20060102150405000000")
+	return fmt.Sprintf("%d", time.Now().UTC().Nanosecond())
 }
 
 var (
