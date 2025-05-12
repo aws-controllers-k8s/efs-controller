@@ -455,7 +455,8 @@ func (rm *resourceManager) sdkUpdate(
 	defer func() {
 		exit(err)
 	}()
-
+	res := desired.ko.DeepCopy()
+	res.Status = latest.ko.Status
 	if delta.DifferentAt("Spec.Tags") {
 		err := syncTags(
 			ctx, rm.sdkapi, rm.metrics,
@@ -463,38 +464,39 @@ func (rm *resourceManager) sdkUpdate(
 			desired.ko.Spec.Tags, latest.ko.Spec.Tags,
 		)
 		if err != nil {
-			return nil, err
+			return &resource{res}, err
 		}
 	}
 	if delta.DifferentAt("Spec.Policy") {
 		err := rm.syncPolicy(ctx, desired)
 		if err != nil {
-			return nil, err
+			return &resource{res}, err
 		}
 	}
 	if delta.DifferentAt("Spec.BackupPolicy") {
 		err := rm.syncBackupPolicy(ctx, desired)
 		if err != nil {
-			return nil, err
+			return &resource{res}, err
 		}
 	}
 	if delta.DifferentAt("Spec.LifecyclePolicies") {
 		err := rm.syncLifecyclePolicies(ctx, desired)
 		if err != nil {
-			return nil, err
+			return &resource{res}, err
 		}
 	}
 	if delta.DifferentAt("Spec.FileSystemProtection") {
 		err := rm.syncFilesystemProtection(ctx, desired)
 		if err != nil {
-			return nil, err
+			return &resource{res}, err
 		}
 	}
 	// To trigger to normal update we need to make sure that at least
 	// one of the following fields are different.
 	if !delta.DifferentAt("Spec.ProvisionedThroughputInMiBps") && !delta.DifferentAt("Spec.ThroughputMode") {
-		return desired, nil
+		return &resource{res}, nil
 	}
+
 	input, err := rm.newUpdateRequestPayload(ctx, desired, delta)
 	if err != nil {
 		return nil, err
@@ -503,7 +505,6 @@ func (rm *resourceManager) sdkUpdate(
 	var resp *svcsdk.UpdateFileSystemOutput
 	_ = resp
 	resp, err = rm.sdkapi.UpdateFileSystem(ctx, input)
-	return desired, nil
 	rm.metrics.RecordAPICall("UPDATE", "UpdateFileSystem", err)
 	if err != nil {
 		return nil, err
@@ -511,6 +512,8 @@ func (rm *resourceManager) sdkUpdate(
 	// Merge in the information we read from the API call above to the copy of
 	// the original Kubernetes object we passed to the function
 	ko := desired.ko.DeepCopy()
+	ko.Status = latest.ko.Status
+	return &resource{ko}, nil
 
 	if resp.AvailabilityZoneId != nil {
 		ko.Status.AvailabilityZoneID = resp.AvailabilityZoneId

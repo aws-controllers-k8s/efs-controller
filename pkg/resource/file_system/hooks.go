@@ -56,7 +56,7 @@ func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("filesystem in '%s' state, requeuing until filesystem is '%s'",
 			status, svcapitypes.LifeCycleState_available),
-		time.Second*10,
+		time.Second*3,
 	)
 }
 
@@ -223,6 +223,10 @@ func (rm *resourceManager) syncPolicy(ctx context.Context, r *resource) (err err
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.syncPolicy")
 	defer func() { exit(err) }()
+
+	if r.ko.Spec.Policy == nil {
+		return nil
+	}
 
 	_, err = rm.sdkapi.PutFileSystemPolicy(
 		ctx,
