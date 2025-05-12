@@ -1,4 +1,7 @@
 	res := desired.ko.DeepCopy()
+	// This step Will ensure that the latest Status
+	// is patched into k8s, and user will be able
+	// to see the latest efs filesystem Status
 	res.Status = latest.ko.Status
 	if delta.DifferentAt("Spec.Tags") {
 		err := syncTags(

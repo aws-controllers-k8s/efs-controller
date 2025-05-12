@@ -224,10 +224,6 @@ func (rm *resourceManager) syncPolicy(ctx context.Context, r *resource) (err err
 	exit := rlog.Trace("rm.syncPolicy")
 	defer func() { exit(err) }()
 
-	if r.ko.Spec.Policy == nil {
-		return nil
-	}
-
 	_, err = rm.sdkapi.PutFileSystemPolicy(
 		ctx,
 		&svcsdk.PutFileSystemPolicyInput{
