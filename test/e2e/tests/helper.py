@@ -43,7 +43,7 @@ class EFSValidator:
 
         except Exception as e:
             logging.debug(e)
-            return None
+            return e
         
     def get_file_system_lifecycle_policy(self, filesystem_id: str) -> dict:
         try:

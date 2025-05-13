@@ -140,6 +140,16 @@ class TestFileSystem:
         observedPolicy = validator.get_file_system_policy(file_system_id)
         assert json.loads(policy) == json.loads(observedPolicy)
 
+        updates = {
+            "spec": {
+                "policy": None
+            }
+        }
+        k8s.patch_custom_resource(ref, updates)
+        time.sleep(UPDATE_WAIT_AFTER_SECONDS)
+        observedPolicyException = validator.get_file_system_policy(file_system_id)
+        assert isinstance(observedPolicyException , efs_client.exceptions.PolicyNotFound)
+
     def test_update_backup_policy(self, efs_client, simple_file_system):
         (ref, _, file_system_id) = simple_file_system
         assert file_system_id is not None
