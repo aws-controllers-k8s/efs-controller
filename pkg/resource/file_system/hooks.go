@@ -56,7 +56,7 @@ func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("filesystem in '%s' state, requeuing until filesystem is '%s'",
 			status, svcapitypes.LifeCycleState_available),
-		time.Second*10,
+		time.Second*3,
 	)
 }
 

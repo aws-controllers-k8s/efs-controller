@@ -90,11 +90,12 @@ def simple_file_system(efs_client):
 class TestFileSystem:
 
     def test_create_delete(self, efs_client, simple_file_system):
-        (_, _, file_system_id) = simple_file_system
+        (ref, _, file_system_id) = simple_file_system
         assert file_system_id is not None
 
         validator = EFSValidator(efs_client)
         assert validator.file_system_exists(file_system_id)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
     
     def test_create_update_delete(self, efs_client, simple_file_system):
         (ref, _, file_system_id) = simple_file_system
@@ -116,6 +117,7 @@ class TestFileSystem:
 
         fs = validator.get_file_system(file_system_id)
         assert fs is not None
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         assert fs['FileSystems'][0]['ThroughputMode'] == "elastic"
         assert fs['FileSystems'][0]['FileSystemProtection']['ReplicationOverwriteProtection'] == "DISABLED"
 
@@ -138,6 +140,7 @@ class TestFileSystem:
         time.sleep(CREATE_WAIT_AFTER_SECONDS)
 
         observedPolicy = validator.get_file_system_policy(file_system_id)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         assert json.loads(policy) == json.loads(observedPolicy)
 
     def test_update_backup_policy(self, efs_client, simple_file_system):
@@ -159,6 +162,7 @@ class TestFileSystem:
 
         bp = validator.get_backup_policy(file_system_id)
         assert bp is not None
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         assert bp['Status'] == "DISABLED"
 
     def test_update_lifecycle_policies(self, efs_client, simple_file_system):
@@ -168,6 +172,7 @@ class TestFileSystem:
         validator = EFSValidator(efs_client)
         assert validator.file_system_exists(file_system_id)
 
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         updates = {
             "spec": {
                 "lifecyclePolicies": [
@@ -180,6 +185,7 @@ class TestFileSystem:
 
         lfps = validator.get_file_system_lifecycle_policy(file_system_id)
         assert lfps is not None
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         assert lfps[0]['TransitionToIA'] == "AFTER_30_DAYS"
     
     def test_update_tags(self, efs_client, simple_file_system):
@@ -188,6 +194,7 @@ class TestFileSystem:
 
         validator = EFSValidator(efs_client)
         assert validator.file_system_exists(file_system_id)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
 
         desired_tags = [{
             "key": "Name",
@@ -203,6 +210,7 @@ class TestFileSystem:
 
         fs = validator.get_file_system(file_system_id)
         assert fs is not None
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         latest_tags = fs['FileSystems'][0]["Tags"]
 
         tags.assert_ack_system_tags(
