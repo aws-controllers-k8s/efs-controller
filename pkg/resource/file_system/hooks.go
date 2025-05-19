@@ -224,6 +224,10 @@ func (rm *resourceManager) syncPolicy(ctx context.Context, r *resource) (err err
 	exit := rlog.Trace("rm.syncPolicy")
 	defer func() { exit(err) }()
 
+	if r.ko.Spec.Policy == nil {
+		return rm.deletePolicy(ctx, r)
+	}
+
 	_, err = rm.sdkapi.PutFileSystemPolicy(
 		ctx,
 		&svcsdk.PutFileSystemPolicyInput{
@@ -233,6 +237,21 @@ func (rm *resourceManager) syncPolicy(ctx context.Context, r *resource) (err err
 		},
 	)
 	rm.metrics.RecordAPICall("UPDATE", "PutFileSystemPolicy", err)
+	return err
+}
+
+func (rm *resourceManager) deletePolicy(ctx context.Context, r *resource) (err error) {
+	rlog := ackrtlog.FromContext(ctx)
+	exit := rlog.Trace("rm.deletePolicy")
+	defer func() { exit(err) }()
+
+	_, err = rm.sdkapi.DeleteFileSystemPolicy(
+		ctx,
+		&svcsdk.DeleteFileSystemPolicyInput{
+			FileSystemId: r.ko.Status.FileSystemID,
+		},
+	)
+	rm.metrics.RecordAPICall("UPDATE", "DeleteFileSystemPolicy", err)
 	return err
 }
 
