@@ -24,9 +24,13 @@ import (
 type MountTargetSpec struct {
 
 	// The ID of the file system for which to create the mount target.
+	//
+	// Regex Pattern: `^(arn:aws[-a-z]*:elasticfilesystem:[0-9a-z-:]+:file-system/fs-[0-9a-f]{8,40}|fs-[0-9a-f]{8,40})$`
 	FileSystemID  *string                                  `json:"fileSystemID,omitempty"`
 	FileSystemRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"fileSystemRef,omitempty"`
 	// Valid IPv4 address within the address range of the specified subnet.
+	//
+	// Regex Pattern: `^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$`
 	IPAddress         *string                                    `json:"ipAddress,omitempty"`
 	SecurityGroupRefs []*ackv1alpha1.AWSResourceReferenceWrapper `json:"securityGroupRefs,omitempty"`
 	// Up to five VPC security group IDs, of the form sg-xxxxxxxx. These must be
@@ -34,6 +38,8 @@ type MountTargetSpec struct {
 	SecurityGroups []*string `json:"securityGroups,omitempty"`
 	// The ID of the subnet to add the mount target in. For One Zone file systems,
 	// use the subnet that is associated with the file system's Availability Zone.
+	//
+	// Regex Pattern: `^subnet-[0-9a-f]{8,40}$`
 	SubnetID  *string                                  `json:"subnetID,omitempty"`
 	SubnetRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"subnetRef,omitempty"`
 }
@@ -61,12 +67,16 @@ type MountTargetStatus struct {
 	// For example, the Availability Zone us-east-1a for your Amazon Web Services
 	// account might not be the same location as us-east-1a for another Amazon Web
 	// Services account.
+	//
+	// Regex Pattern: `^.+$`
 	// +kubebuilder:validation:Optional
 	AvailabilityZoneName *string `json:"availabilityZoneName,omitempty"`
 	// Lifecycle state of the mount target.
 	// +kubebuilder:validation:Optional
 	LifeCycleState *string `json:"lifeCycleState,omitempty"`
 	// System-assigned mount target ID.
+	//
+	// Regex Pattern: `^fsmt-[0-9a-f]{8,40}$`
 	// +kubebuilder:validation:Optional
 	MountTargetID *string `json:"mountTargetID,omitempty"`
 	// The ID of the network interface that Amazon EFS created when it created the
@@ -74,6 +84,8 @@ type MountTargetStatus struct {
 	// +kubebuilder:validation:Optional
 	NetworkInterfaceID *string `json:"networkInterfaceID,omitempty"`
 	// Amazon Web Services account ID that owns the resource.
+	//
+	// Regex Pattern: `^(\d{12})|(\d{4}-\d{4}-\d{4})$`
 	// +kubebuilder:validation:Optional
 	OwnerID *string `json:"ownerID,omitempty"`
 	// The virtual private cloud (VPC) ID that the mount target is configured in.

@@ -83,6 +83,8 @@ spec:
 
                   One Zone file systems are not available in all Availability Zones in Amazon
                   Web Services Regions where Amazon EFS is available.
+
+                  Regex Pattern: `^.+$`
                 type: string
               backup:
                 description: |-
@@ -138,6 +140,8 @@ spec:
 
                   EFS accepts only symmetric KMS keys. You cannot use asymmetric KMS keys with
                   Amazon EFS file systems.
+
+                  Regex Pattern: `^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|mrk-[0-9a-f]{32}|alias/[a-zA-Z0-9/_-]+|(arn:aws[-a-z]*:kms:[a-z0-9-]+:\d{12}:((key/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})|(key/mrk-[0-9a-f]{32})|(alias/[a-zA-Z0-9/_-]+))))$`
                 type: string
               kmsKeyRef:
                 description: "AWSResourceReferenceWrapper provides a wrapper around
@@ -223,6 +227,8 @@ spec:
                   definition. EFS file system policies have a 20,000 character limit. To find
                   out more about the elements that make up a file system policy, see Resource-based
                   policies within Amazon EFS (https://docs.aws.amazon.com/efs/latest/ug/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies).
+
+                  Regex Pattern: `^[\s\S]+$`
                 type: string
               provisionedThroughputInMiBps:
                 description: |-
@@ -347,7 +353,10 @@ spec:
                 format: date-time
                 type: string
               fileSystemID:
-                description: The ID of the file system, assigned by Amazon EFS.
+                description: |-
+                  The ID of the file system, assigned by Amazon EFS.
+
+                  Regex Pattern: `^(arn:aws[-a-z]*:elasticfilesystem:[0-9a-z-:]+:file-system/fs-[0-9a-f]{8,40}|fs-[0-9a-f]{8,40})$`
                 type: string
               lifeCycleState:
                 description: The lifecycle phase of the file system.
@@ -357,6 +366,8 @@ spec:
                   You can add tags to a file system, including a Name tag. For more information,
                   see CreateFileSystem. If the file system has a Name tag, Amazon EFS returns
                   the value in this field.
+
+                  Regex Pattern: `^([\p{L}\p{Z}\p{N}_.:/=+\-@]*)$`
                 type: string
               numberOfMountTargets:
                 description: |-
@@ -365,8 +376,10 @@ spec:
                 format: int64
                 type: integer
               ownerID:
-                description: The Amazon Web Services account that created the file
-                  system.
+                description: |-
+                  The Amazon Web Services account that created the file system.
+
+                  Regex Pattern: `^(\d{12})|(\d{4}-\d{4}-\d{4})$`
                 type: string
               sizeInBytes:
                 description: |-
