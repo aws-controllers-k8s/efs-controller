@@ -31,6 +31,8 @@ type FileSystemSpec struct {
 	//
 	// One Zone file systems are not available in all Availability Zones in Amazon
 	// Web Services Regions where Amazon EFS is available.
+	//
+	// Regex Pattern: `^.+$`
 	AvailabilityZoneName *string `json:"availabilityZoneName,omitempty"`
 	// Specifies whether automatic backups are enabled on the file system that you
 	// are creating. Set the value to true to enable automatic backups. If you are
@@ -72,6 +74,8 @@ type FileSystemSpec struct {
 	//
 	// EFS accepts only symmetric KMS keys. You cannot use asymmetric KMS keys with
 	// Amazon EFS file systems.
+	//
+	// Regex Pattern: `^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|mrk-[0-9a-f]{32}|alias/[a-zA-Z0-9/_-]+|(arn:aws[-a-z]*:kms:[a-z0-9-]+:\d{12}:((key/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})|(key/mrk-[0-9a-f]{32})|(alias/[a-zA-Z0-9/_-]+))))$`
 	KMSKeyID  *string                                  `json:"kmsKeyID,omitempty"`
 	KMSKeyRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"kmsKeyRef,omitempty"`
 	// An array of LifecyclePolicy objects that define the file system's LifecycleConfiguration
@@ -116,6 +120,8 @@ type FileSystemSpec struct {
 	// definition. EFS file system policies have a 20,000 character limit. To find
 	// out more about the elements that make up a file system policy, see Resource-based
 	// policies within Amazon EFS (https://docs.aws.amazon.com/efs/latest/ug/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies).
+	//
+	// Regex Pattern: `^[\s\S]+$`
 	Policy *string `json:"policy,omitempty"`
 	// The throughput, measured in mebibytes per second (MiBps), that you want to
 	// provision for a file system that you're creating. Required if ThroughputMode
@@ -167,6 +173,8 @@ type FileSystemStatus struct {
 	// +kubebuilder:validation:Optional
 	CreationTime *metav1.Time `json:"creationTime,omitempty"`
 	// The ID of the file system, assigned by Amazon EFS.
+	//
+	// Regex Pattern: `^(arn:aws[-a-z]*:elasticfilesystem:[0-9a-z-:]+:file-system/fs-[0-9a-f]{8,40}|fs-[0-9a-f]{8,40})$`
 	// +kubebuilder:validation:Optional
 	FileSystemID *string `json:"fileSystemID,omitempty"`
 	// The lifecycle phase of the file system.
@@ -175,6 +183,8 @@ type FileSystemStatus struct {
 	// You can add tags to a file system, including a Name tag. For more information,
 	// see CreateFileSystem. If the file system has a Name tag, Amazon EFS returns
 	// the value in this field.
+	//
+	// Regex Pattern: `^([\p{L}\p{Z}\p{N}_.:/=+\-@]*)$`
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty"`
 	// The current number of mount targets that the file system has. For more information,
@@ -182,6 +192,8 @@ type FileSystemStatus struct {
 	// +kubebuilder:validation:Optional
 	NumberOfMountTargets *int64 `json:"numberOfMountTargets,omitempty"`
 	// The Amazon Web Services account that created the file system.
+	//
+	// Regex Pattern: `^(\d{12})|(\d{4}-\d{4}-\d{4})$`
 	// +kubebuilder:validation:Optional
 	OwnerID *string `json:"ownerID,omitempty"`
 	// The latest known metered size (in bytes) of data stored in the file system,
