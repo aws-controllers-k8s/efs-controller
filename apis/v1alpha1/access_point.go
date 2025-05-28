@@ -24,6 +24,8 @@ import (
 type AccessPointSpec struct {
 
 	// The ID of the EFS file system that the access point provides access to.
+	//
+	// Regex Pattern: `^(arn:aws[-a-z]*:elasticfilesystem:[0-9a-z-:]+:file-system/fs-[0-9a-f]{8,40}|fs-[0-9a-f]{8,40})$`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable once set"
 	FileSystemID  *string                                  `json:"fileSystemID,omitempty"`
 	FileSystemRef *ackv1alpha1.AWSResourceReferenceWrapper `json:"fileSystemRef,omitempty"`
@@ -66,6 +68,8 @@ type AccessPointStatus struct {
 	// +kubebuilder:validation:Optional
 	Conditions []*ackv1alpha1.Condition `json:"conditions"`
 	// The ID of the access point, assigned by Amazon EFS.
+	//
+	// Regex Pattern: `^(arn:aws[-a-z]*:elasticfilesystem:[0-9a-z-:]+:access-point/fsap-[0-9a-f]{8,40}|fsap-[0-9a-f]{8,40})$`
 	// +kubebuilder:validation:Optional
 	AccessPointID *string `json:"accessPointID,omitempty"`
 	// Identifies the lifecycle phase of the access point.
@@ -75,6 +79,8 @@ type AccessPointStatus struct {
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty"`
 	// Identifies the Amazon Web Services account that owns the access point resource.
+	//
+	// Regex Pattern: `^(\d{12})|(\d{4}-\d{4}-\d{4})$`
 	// +kubebuilder:validation:Optional
 	OwnerID *string `json:"ownerID,omitempty"`
 }
