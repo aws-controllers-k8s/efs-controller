@@ -146,13 +146,18 @@ func (rm *resourceManager) customUpdateMountTarget(
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.sdkUpdate")
 	defer func() { exit(err) }()
+	updated = rm.concreteResource(desired.DeepCopy())
+	updated.SetStatus(latest)
+	if !mountTargetActive(updated) {
+		return updated, requeueWaitState(updated)
+	}
 
 	if delta.DifferentAt("Spec.SecurityGroups") {
-		err := rm.putSecurityGroups(ctx, desired)
+		err := rm.putSecurityGroups(ctx, updated)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return desired, nil
+	return updated, nil
 }

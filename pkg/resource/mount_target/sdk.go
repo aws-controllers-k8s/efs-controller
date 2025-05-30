@@ -150,10 +150,7 @@ func (rm *resourceManager) sdkFind(
 
 	rm.setStatusDefaults(ko)
 	if err := rm.setResourceAdditionalFields(ctx, ko); err != nil {
-		return nil, err
-	}
-	if !mountTargetActive(&resource{ko}) {
-		return &resource{ko}, requeueWaitState(r)
+		return &resource{ko}, err
 	}
 
 	return &resource{ko}, nil
@@ -266,15 +263,6 @@ func (rm *resourceManager) sdkCreate(
 	}
 
 	rm.setStatusDefaults(ko)
-	// We expect the MT to be in 'creating' status since we just issued
-	// the call to create it, but I suppose it doesn't hurt to check here.
-	if mountTargetCreating(&resource{ko}) {
-		// Setting resource synced condition to false will trigger a requeue of
-		// the resource. No need to return a requeue error here.
-		ackcondition.SetSynced(&resource{ko}, corev1.ConditionFalse, nil, nil)
-		return &resource{ko}, nil
-	}
-
 	return &resource{ko}, nil
 }
 

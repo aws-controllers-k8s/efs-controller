@@ -43,7 +43,6 @@ def simple_mount_target(efs_client, simple_file_system):
     replacements = REPLACEMENT_VALUES.copy()
     replacements["MOUNT_TARGET_NAME"] = resource_name
     replacements["FILE_SYSTEM_ID"] = file_system_id
-    replacements["IP_ADDRESS"] = "10.0.0.100"
 
     # Load efs CR
     resource_data = load_efs_resource(
@@ -87,8 +86,12 @@ def simple_mount_target(efs_client, simple_file_system):
 @pytest.mark.canary
 class TestMountTarget:
     def test_create_delete(self, efs_client, simple_mount_target):
-        (_, _, mount_target_id) = simple_mount_target
+        (ref, _, mount_target_id) = simple_mount_target
         assert mount_target_id is not None
 
         validator = EFSValidator(efs_client)
         assert validator.mount_target_exists(mount_target_id)
+        
+        cr = k8s.get_resource(ref)
+        assert 'spec' in cr
+        assert 'ipAddress' in cr['spec']

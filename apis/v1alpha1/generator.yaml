@@ -25,6 +25,10 @@ model_name: elasticfilesystem
 controller_name: efs
 resources:
   FileSystem:
+    synced:
+      when:
+        - path: Status.LifeCycleState
+          in: [ "available" ]
     fields:
       Backup:
         compare:
@@ -107,6 +111,10 @@ resources:
         type: string
         index: 30
   MountTarget:
+    synced:
+      when:
+        - path: Status.LifeCycleState
+          in: [ "available" ]
     tags:
       ignore: true
     fields:
@@ -127,8 +135,6 @@ resources:
     update_operation:
       custom_method_name: customUpdateMountTarget
     hooks:
-      sdk_create_post_set_output:
-        template_path: hooks/mount_target/sdk_create_post_set_output.go.tpl
       sdk_read_many_post_build_request:
         template_path: hooks/mount_target/sdk_read_many_post_build_request.go.tpl
       sdk_read_many_post_set_output:
