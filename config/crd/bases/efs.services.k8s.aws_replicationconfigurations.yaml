@@ -1,0 +1,238 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.2
+  name: replicationconfigurations.efs.services.k8s.aws
+spec:
+  group: efs.services.k8s.aws
+  names:
+    kind: ReplicationConfiguration
+    listKind: ReplicationConfigurationList
+    plural: replicationconfigurations
+    singular: replicationconfiguration
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.sourceFileSystemId
+      name: SOURCEFS
+      type: string
+    - jsonPath: .status.sourceFileSystemRegion
+      name: REGION
+      type: string
+    - jsonPath: .spec.destinations
+      name: DESTINATIONS
+      type: integer
+    - jsonPath: .status.conditions[?(@.type=="ACK.ResourceSynced")].status
+      name: Synced
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ReplicationConfiguration is the Schema for the ReplicationConfigurations
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ReplicationConfigurationSpec defines the desired state of
+              ReplicationConfiguration.
+            properties:
+              destinations:
+                description: |-
+                  An array of destination configuration objects. Only one destination configuration
+                  object is supported.
+                items:
+                  description: |-
+                    Describes the new or existing destination file system for the replication
+                    configuration.
+
+                       * If you want to replicate to a new file system, do not specify the File
+                       System ID for the destination file system. Amazon EFS creates a new, empty
+                       file system. For One Zone storage, specify the Availability Zone to create
+                       the file system in. To use an Key Management Service key other than the
+                       default KMS key, then specify it. For more information, see Configuring
+                       replication to new Amazon EFS file system (https://docs.aws.amazon.com/efs/latest/ug/create-replication.html)
+                       in the Amazon EFS User Guide. After the file system is created, you cannot
+                       change the KMS key or the performance mode.
+
+                       * If you want to replicate to an existing file system that's in the same
+                       account as the source file system, then you need to provide the ID or
+                       Amazon Resource Name (ARN) of the file system to which to replicate. The
+                       file system's replication overwrite protection must be disabled. For more
+                       information, see Replicating to an existing file system (https://docs.aws.amazon.com/efs/latest/ug/efs-replication#replicate-existing-destination)
+                       in the Amazon EFS User Guide.
+
+                       * If you are replicating the file system to a file system that's in a
+                       different account than the source file system (cross-account replication),
+                       you need to provide the ARN for the file system and the IAM role that
+                       allows Amazon EFS to perform replication on the destination account. The
+                       file system's replication overwrite protection must be disabled. For more
+                       information, see Replicating across Amazon Web Services accounts (https://docs.aws.amazon.com/efs/latest/ug/cross-account-replication.html)
+                       in the Amazon EFS User Guide.
+                  properties:
+                    availabilityZoneName:
+                      type: string
+                    fileSystemID:
+                      type: string
+                    kmsKeyID:
+                      type: string
+                    region:
+                      type: string
+                    roleARN:
+                      type: string
+                  type: object
+                type: array
+                x-kubernetes-validations:
+                - message: Value is immutable once set
+                  rule: self == oldSelf
+              sourceFileSystemID:
+                description: |-
+                  Specifies the Amazon EFS file system that you want to replicate. This file
+                  system cannot already be a source or destination file system in another replication
+                  configuration.
+
+                  Regex Pattern: `^(arn:aws[-a-z]*:elasticfilesystem:[0-9a-z-:]+:file-system/fs-[0-9a-f]{8,40}|fs-[0-9a-f]{8,40})$`
+                type: string
+                x-kubernetes-validations:
+                - message: Value is immutable once set
+                  rule: self == oldSelf
+              sourceFileSystemRef:
+                description: "AWSResourceReferenceWrapper provides a wrapper around
+                  *AWSResourceReference\ntype to provide more user friendly syntax
+                  for references using 'from' field\nEx:\nAPIIDRef:\n\n\tfrom:\n\t
+                  \ name: my-api"
+                properties:
+                  from:
+                    description: |-
+                      AWSResourceReference provides all the values necessary to reference another
+                      k8s resource for finding the identifier(Id/ARN/Name)
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    type: object
+                type: object
+            required:
+            - destinations
+            type: object
+          status:
+            description: ReplicationConfigurationStatus defines the observed state
+              of ReplicationConfiguration
+            properties:
+              ackResourceMetadata:
+                description: |-
+                  All CRs managed by ACK have a common `Status.ACKResourceMetadata` member
+                  that is used to contain resource sync state, account ownership,
+                  constructed ARN for the resource
+                properties:
+                  arn:
+                    description: |-
+                      ARN is the Amazon Resource Name for the resource. This is a
+                      globally-unique identifier and is set only by the ACK service controller
+                      once the controller has orchestrated the creation of the resource OR
+                      when it has verified that an "adopted" resource (a resource where the
+                      ARN annotation was set by the Kubernetes user on the CR) exists and
+                      matches the supplied CR's Spec field values.
+                      https://github.com/aws/aws-controllers-k8s/issues/270
+                    type: string
+                  ownerAccountID:
+                    description: |-
+                      OwnerAccountID is the AWS Account ID of the account that owns the
+                      backend AWS service API resource.
+                    type: string
+                  region:
+                    description: Region is the AWS region in which the resource exists
+                      or will exist.
+                    type: string
+                required:
+                - ownerAccountID
+                - region
+                type: object
+              conditions:
+                description: |-
+                  All CRs managed by ACK have a common `Status.Conditions` member that
+                  contains a collection of `ackv1alpha1.Condition` objects that describe
+                  the various terminal states of the CR and its backend AWS service API
+                  resource
+                items:
+                  description: |-
+                    Condition is the common struct used by all CRDs managed by ACK service
+                    controllers to indicate terminal states  of the CR and its backend AWS
+                    service API resource
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type is the type of the Condition
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              creationTime:
+                description: Describes when the replication configuration was created.
+                format: date-time
+                type: string
+              originalSourceFileSystemARN:
+                description: |-
+                  The Amazon Resource Name (ARN) of the original source EFS file system in
+                  the replication configuration.
+                type: string
+              sourceFileSystemARN:
+                description: |-
+                  The Amazon Resource Name (ARN) of the current source file system in the replication
+                  configuration.
+                type: string
+              sourceFileSystemOwnerID:
+                description: |-
+                  ID of the Amazon Web Services account in which the source file system resides.
+
+                  Regex Pattern: `^(\d{12})|(\d{4}-\d{4}-\d{4})$`
+                type: string
+              sourceFileSystemRegion:
+                description: |-
+                  The Amazon Web Services Region in which the source EFS file system is located.
+
+                  Regex Pattern: `^[a-z]{2}-((iso[a-z]{0,1}-)|(gov-)){0,1}[a-z]+-{0,1}[0-9]{0,1}$`
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

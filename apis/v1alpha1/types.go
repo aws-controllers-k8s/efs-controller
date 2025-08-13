@@ -80,6 +80,10 @@ type Destination struct {
 	FileSystemID            *string      `json:"fileSystemID,omitempty"`
 	LastReplicatedTimestamp *metav1.Time `json:"lastReplicatedTimestamp,omitempty"`
 	OwnerID                 *string      `json:"ownerID,omitempty"`
+	Region                  *string      `json:"region,omitempty"`
+	RoleARN                 *string      `json:"roleARN,omitempty"`
+	Status                  *string      `json:"status,omitempty"`
+	StatusMessage           *string      `json:"statusMessage,omitempty"`
 }
 
 // Describes the new or existing destination file system for the replication
@@ -112,6 +116,8 @@ type DestinationToCreate struct {
 	AvailabilityZoneName *string `json:"availabilityZoneName,omitempty"`
 	FileSystemID         *string `json:"fileSystemID,omitempty"`
 	KMSKeyID             *string `json:"kmsKeyID,omitempty"`
+	Region               *string `json:"region,omitempty"`
+	RoleARN              *string `json:"roleARN,omitempty"`
 }
 
 // A description of the file system.
@@ -205,11 +211,13 @@ type PosixUser struct {
 
 // Describes the replication configuration for a specific file system.
 type ReplicationConfigurationDescription struct {
-	CreationTime                *metav1.Time `json:"creationTime,omitempty"`
-	OriginalSourceFileSystemARN *string      `json:"originalSourceFileSystemARN,omitempty"`
-	SourceFileSystemARN         *string      `json:"sourceFileSystemARN,omitempty"`
-	SourceFileSystemID          *string      `json:"sourceFileSystemID,omitempty"`
-	SourceFileSystemOwnerID     *string      `json:"sourceFileSystemOwnerID,omitempty"`
+	CreationTime                *metav1.Time   `json:"creationTime,omitempty"`
+	Destinations                []*Destination `json:"destinations,omitempty"`
+	OriginalSourceFileSystemARN *string        `json:"originalSourceFileSystemARN,omitempty"`
+	SourceFileSystemARN         *string        `json:"sourceFileSystemARN,omitempty"`
+	SourceFileSystemID          *string        `json:"sourceFileSystemID,omitempty"`
+	SourceFileSystemOwnerID     *string        `json:"sourceFileSystemOwnerID,omitempty"`
+	SourceFileSystemRegion      *string        `json:"sourceFileSystemRegion,omitempty"`
 }
 
 // Specifies the directory on the Amazon EFS file system that the access point

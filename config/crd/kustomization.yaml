@@ -5,3 +5,4 @@ resources:
   - bases/efs.services.k8s.aws_accesspoints.yaml
   - bases/efs.services.k8s.aws_filesystems.yaml
   - bases/efs.services.k8s.aws_mounttargets.yaml
+  - bases/efs.services.k8s.aws_replicationconfigurations.yaml

@@ -85,6 +85,7 @@ rules:
   - accesspoints
   - filesystems
   - mounttargets
+  - replicationconfigurations
   verbs:
   - create
   - delete
@@ -99,6 +100,7 @@ rules:
   - accesspoints/status
   - filesystems/status
   - mounttargets/status
+  - replicationconfigurations/status
   verbs:
   - get
   - patch

@@ -3,7 +3,6 @@ ignore:
       # AccessPoint
       # FileSystem
       # MountTarget
-      - ReplicationConfiguration
   field_paths:
   - CreateFileSystemInput.CreationToken
   - UpdateFileSystemOutput.CreationToken
@@ -240,3 +239,59 @@ resources:
         json_path: .status.lifeCycleState
         type: string
         index: 40
+  ReplicationConfiguration:
+    # Add tags ignore configuration to fix the build error
+    tags:
+      ignore: true
+    fields:
+      # Primary identifier
+      SourceFileSystemId:
+        is_primary_key: true
+        is_immutable: true
+        references:
+          resource: FileSystem
+          path: Status.FileSystemID
+      
+      # Immutable fields
+      Destinations:
+        is_immutable: true
+      
+      # Computed fields
+      SourceFileSystemArn:
+        is_read_only: true
+      SourceFileSystemRegion:
+        is_read_only: true
+      CreationTime:
+        is_read_only: true
+      OriginalSourceFileSystemArn:
+        is_read_only: true
+    
+    # Configure exception handling
+    exceptions:
+      errors:
+        404:
+          code: ReplicationNotFound
+      terminal_codes:
+        - BadRequest
+        - FileSystemNotFound
+        - IncorrectFileSystemLifeCycleState
+        - ValidationException
+    
+    # Print configuration for kubectl get
+    print:
+      add_age_column: true
+      add_synced_column: true
+      order_by: index
+      additional_columns:
+      - name: SOURCEFS
+        json_path: .spec.sourceFileSystemId
+        type: string
+        index: 10
+      - name: REGION
+        json_path: .status.sourceFileSystemRegion
+        type: string
+        index: 20
+      - name: DESTINATIONS
+        json_path: .spec.destinations
+        type: integer
+        index: 30

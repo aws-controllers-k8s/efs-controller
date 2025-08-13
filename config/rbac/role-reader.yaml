@@ -12,6 +12,7 @@ rules:
   - accesspoints
   - filesystems
   - mounttargets
+  - replicationconfigurations
   verbs:
   - get
   - list
