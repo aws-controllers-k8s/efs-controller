@@ -12,6 +12,7 @@ rules:
   - accesspoints
   - filesystems
   - mounttargets
+  - replicationconfigurations
   verbs:
   - create
   - delete
@@ -26,6 +27,7 @@ rules:
   - accesspoints
   - filesystems
   - mounttargets
+  - replicationconfigurations
   verbs:
   - get
   - patch
