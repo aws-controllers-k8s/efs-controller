@@ -131,6 +131,8 @@ type FileSystemSpec struct {
 	// (https://docs.aws.amazon.com/efs/latest/ug/limits.html#soft-limits) in the
 	// Amazon EFS User Guide.
 	ProvisionedThroughputInMiBps *float64 `json:"provisionedThroughputInMiBps,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable once set"
+	ReplicationConfiguration []*DestinationToCreate `json:"replicationConfiguration,omitempty"`
 	// Use to create one or more tags associated with the file system. Each tag
 	// is a user-defined key-value pair. Name your file system on creation by including
 	// a "Key":"Name","Value":"{value}" key-value pair. Each key must be unique.
@@ -196,6 +198,8 @@ type FileSystemStatus struct {
 	// Regex Pattern: `^(\d{12})|(\d{4}-\d{4}-\d{4})$`
 	// +kubebuilder:validation:Optional
 	OwnerID *string `json:"ownerID,omitempty"`
+	// +kubebuilder:validation:Optional
+	ReplicationConfigurationStatus []*Destination `json:"replicationConfigurationStatus,omitempty"`
 	// The latest known metered size (in bytes) of data stored in the file system,
 	// in its Value field, and the time at which that size was determined in its
 	// Timestamp field. The Timestamp value is the integer number of seconds since
