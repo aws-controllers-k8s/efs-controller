@@ -1,5 +1,5 @@
 	// Check if replication is busy before allowing any updates
-	if replicationConfigurationUpdating(latest) {
+	if !replicationConfigurationActive(latest) {
 		return nil, requeueWaitReplicationConfiguration
 	}
 

@@ -1,5 +1,5 @@
 	// Check replication status first and requeue if deleting
-	if replicationConfigurationUpdating(r) {
+	if !replicationConfigurationActive(r) {
 		return nil, requeueWaitReplicationConfiguration
 	}
 

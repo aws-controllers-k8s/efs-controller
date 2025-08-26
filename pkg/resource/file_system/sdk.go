@@ -453,7 +453,7 @@ func (rm *resourceManager) sdkUpdate(
 		exit(err)
 	}()
 	// Check if replication is busy before allowing any updates
-	if replicationConfigurationUpdating(latest) {
+	if !replicationConfigurationActive(latest) {
 		return nil, requeueWaitReplicationConfiguration
 	}
 
@@ -677,7 +677,7 @@ func (rm *resourceManager) sdkDelete(
 		exit(err)
 	}()
 	// Check replication status first and requeue if deleting
-	if replicationConfigurationUpdating(r) {
+	if !replicationConfigurationActive(r) {
 		return nil, requeueWaitReplicationConfiguration
 	}
 

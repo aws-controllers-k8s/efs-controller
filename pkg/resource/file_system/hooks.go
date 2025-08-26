@@ -20,6 +20,7 @@ import (
 	"time"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
+	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
@@ -70,20 +71,20 @@ var (
 )
 
 // replicationBusy returns true if any replication destination is in a transitional state
-func replicationConfigurationUpdating(r *resource) bool {
+func replicationConfigurationActive(r *resource) bool {
 	if r.ko.Status.ReplicationConfigurationStatus == nil {
-		return false
+		return true
 	}
 	for _, dest := range r.ko.Status.ReplicationConfigurationStatus {
 		if dest.Status != nil {
 			status := *dest.Status
 			if status == string(svcapitypes.ReplicationStatus_ENABLING) ||
 				status == string(svcapitypes.ReplicationStatus_DELETING) {
-				return true
+				return false
 			}
 		}
 	}
-	return false
+	return true
 }
 
 // replicationConfigurationExists returns true if replication configuration exists
@@ -122,7 +123,7 @@ func (rm *resourceManager) setResourceAdditionalFields(ctx context.Context, r *s
 	}
 
 	// Set replication configuration
-	err = rm.getReplicationConfiguration(ctx, r)
+	err = rm.setReplicationConfiguration(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -389,10 +390,10 @@ func customPreCompare(
 	}
 }
 
-// getReplicationConfiguration populates both Spec and Status replication fields for the file system
-func (rm *resourceManager) getReplicationConfiguration(ctx context.Context, r *svcapitypes.FileSystem) (err error) {
+// setReplicationConfiguration populates both Spec and Status replication fields for the file system
+func (rm *resourceManager) setReplicationConfiguration(ctx context.Context, r *svcapitypes.FileSystem) (err error) {
 	rlog := ackrtlog.FromContext(ctx)
-	exit := rlog.Trace("rm.getReplicationConfiguration")
+	exit := rlog.Trace("rm.setReplicationConfiguration")
 	defer func() { exit(err) }()
 
 	var output *svcsdk.DescribeReplicationConfigurationsOutput
@@ -479,16 +480,20 @@ func (rm *resourceManager) syncReplicationConfiguration(ctx context.Context, des
 		return requeueWaitState(latest)
 	}
 
-	if replicationConfigurationUpdating(latest) {
+	if !replicationConfigurationActive(latest) {
 		return requeueWaitReplicationConfiguration
 	}
 
 	desiredHasReplication := len(desired.ko.Spec.ReplicationConfiguration) == 1
 	latestHasReplication := len(latest.ko.Spec.ReplicationConfiguration) == 1
 
-	if len(desired.ko.Spec.ReplicationConfiguration) > 1 || len(latest.ko.Spec.ReplicationConfiguration) > 1 {
-		return ackrequeue.NeededAfter(fmt.Errorf("filesystem in replication configuration currently only allows once replica"), time.Second*3)
-
+	if len(desired.ko.Spec.ReplicationConfiguration) > 1 {
+		rlog.Info("Invalid replication configuration", 
+			"replicationCount", len(desired.ko.Spec.ReplicationConfiguration),
+			"replicationDestinations", desired.ko.Spec.ReplicationConfiguration)
+		msg := fmt.Errorf("EFS replication configuration only allows one replica, got %d replicas", 
+			len(desired.ko.Spec.ReplicationConfiguration))
+		return ackerr.NewTerminalError(msg)
 	}
 
 	if desiredHasReplication && latestHasReplication {
