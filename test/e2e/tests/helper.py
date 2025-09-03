@@ -93,3 +93,31 @@ class EFSValidator:
         
     def access_point_exists(self, access_point_id) -> bool:
         return self.get_access_point(access_point_id) is not None
+        
+    def get_replication_configuration(self, source_filesystem_id: str) -> dict:
+        try:
+            resp = self.efs_client.describe_replication_configurations(
+                FileSystemId=source_filesystem_id
+            )
+            return resp["Replications"]
+        
+        except Exception as e:
+            logging.debug(e)
+            return None
+            
+    def replication_configuration_exists(self, source_filesystem_id: str) -> bool:
+        replications = self.get_replication_configuration(source_filesystem_id)
+        return replications is not None and len(replications) > 0
+        
+    def get_replication_destinations(self, source_filesystem_id: str) -> list:
+        replications = self.get_replication_configuration(source_filesystem_id)
+        if replications and len(replications) > 0:
+            return replications[0].get("Destinations", [])
+        return []
+        
+    def get_destination_file_system_id(self, source_filesystem_id: str, region: str) -> str:
+        destinations = self.get_replication_destinations(source_filesystem_id)
+        for dest in destinations:
+            if dest.get("Region") == region:
+                return dest.get("FileSystemId")
+        return None

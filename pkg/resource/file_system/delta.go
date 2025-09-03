@@ -118,6 +118,13 @@ func newResourceDelta(
 			delta.Add("Spec.ProvisionedThroughputInMiBps", a.ko.Spec.ProvisionedThroughputInMiBps, b.ko.Spec.ProvisionedThroughputInMiBps)
 		}
 	}
+	if len(a.ko.Spec.ReplicationConfiguration) != len(b.ko.Spec.ReplicationConfiguration) {
+		delta.Add("Spec.ReplicationConfiguration", a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration)
+	} else if len(a.ko.Spec.ReplicationConfiguration) > 0 {
+		if !reflect.DeepEqual(a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration) {
+			delta.Add("Spec.ReplicationConfiguration", a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration)
+		}
+	}
 	desiredACKTags, _ := convertToOrderedACKTags(a.ko.Spec.Tags)
 	latestACKTags, _ := convertToOrderedACKTags(b.ko.Spec.Tags)
 	if !ackcompare.MapStringStringEqual(desiredACKTags, latestACKTags) {

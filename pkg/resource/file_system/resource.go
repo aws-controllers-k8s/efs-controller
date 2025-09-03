@@ -97,11 +97,11 @@ func (r *resource) SetIdentifiers(identifier *ackv1alpha1.AWSIdentifiers) error 
 
 // PopulateResourceFromAnnotation populates the fields passed from adoption annotation
 func (r *resource) PopulateResourceFromAnnotation(fields map[string]string) error {
-	tmp, ok := fields["fileSystemID"]
+	f0, ok := fields["fileSystemID"]
 	if !ok {
 		return ackerrors.NewTerminalError(fmt.Errorf("required field missing: fileSystemID"))
 	}
-	r.ko.Status.FileSystemID = &tmp
+	r.ko.Status.FileSystemID = &f0
 
 	return nil
 }

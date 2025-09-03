@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	iamapitypes "github.com/aws-controllers-k8s/iam-controller/apis/v1alpha1"
 	kmsapitypes "github.com/aws-controllers-k8s/kms-controller/apis/v1alpha1"
 	ackv1alpha1 "github.com/aws-controllers-k8s/runtime/apis/core/v1alpha1"
 	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
@@ -34,6 +35,12 @@ import (
 // +kubebuilder:rbac:groups=kms.services.k8s.aws,resources=keys,verbs=get;list
 // +kubebuilder:rbac:groups=kms.services.k8s.aws,resources=keys/status,verbs=get;list
 
+// +kubebuilder:rbac:groups=kms.services.k8s.aws,resources=keys,verbs=get;list
+// +kubebuilder:rbac:groups=kms.services.k8s.aws,resources=keys/status,verbs=get;list
+
+// +kubebuilder:rbac:groups=iam.services.k8s.aws,resources=roles,verbs=get;list
+// +kubebuilder:rbac:groups=iam.services.k8s.aws,resources=roles/status,verbs=get;list
+
 // ClearResolvedReferences removes any reference values that were made
 // concrete in the spec. It returns a copy of the input AWSResource which
 // contains the original *Ref values, but none of their respective concrete
@@ -43,6 +50,24 @@ func (rm *resourceManager) ClearResolvedReferences(res acktypes.AWSResource) ack
 
 	if ko.Spec.KMSKeyRef != nil {
 		ko.Spec.KMSKeyID = nil
+	}
+
+	for f0idx, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.FileSystemRef != nil {
+			ko.Spec.ReplicationConfiguration[f0idx].FileSystemID = nil
+		}
+	}
+
+	for f0idx, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.KMSKeyRef != nil {
+			ko.Spec.ReplicationConfiguration[f0idx].KMSKeyID = nil
+		}
+	}
+
+	for f0idx, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.RoleRef != nil {
+			ko.Spec.ReplicationConfiguration[f0idx].RoleARN = nil
+		}
 	}
 
 	return &resource{ko}
@@ -70,6 +95,24 @@ func (rm *resourceManager) ResolveReferences(
 		resourceHasReferences = resourceHasReferences || fieldHasReferences
 	}
 
+	if fieldHasReferences, err := rm.resolveReferenceForReplicationConfiguration_FileSystemID(ctx, apiReader, ko); err != nil {
+		return &resource{ko}, (resourceHasReferences || fieldHasReferences), err
+	} else {
+		resourceHasReferences = resourceHasReferences || fieldHasReferences
+	}
+
+	if fieldHasReferences, err := rm.resolveReferenceForReplicationConfiguration_KMSKeyID(ctx, apiReader, ko); err != nil {
+		return &resource{ko}, (resourceHasReferences || fieldHasReferences), err
+	} else {
+		resourceHasReferences = resourceHasReferences || fieldHasReferences
+	}
+
+	if fieldHasReferences, err := rm.resolveReferenceForReplicationConfiguration_RoleARN(ctx, apiReader, ko); err != nil {
+		return &resource{ko}, (resourceHasReferences || fieldHasReferences), err
+	} else {
+		resourceHasReferences = resourceHasReferences || fieldHasReferences
+	}
+
 	return &resource{ko}, resourceHasReferences, err
 }
 
@@ -79,6 +122,24 @@ func validateReferenceFields(ko *svcapitypes.FileSystem) error {
 
 	if ko.Spec.KMSKeyRef != nil && ko.Spec.KMSKeyID != nil {
 		return ackerr.ResourceReferenceAndIDNotSupportedFor("KMSKeyID", "KMSKeyRef")
+	}
+
+	for _, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.FileSystemRef != nil && f0iter.FileSystemID != nil {
+			return ackerr.ResourceReferenceAndIDNotSupportedFor("ReplicationConfiguration.FileSystemID", "ReplicationConfiguration.FileSystemRef")
+		}
+	}
+
+	for _, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.KMSKeyRef != nil && f0iter.KMSKeyID != nil {
+			return ackerr.ResourceReferenceAndIDNotSupportedFor("ReplicationConfiguration.KMSKeyID", "ReplicationConfiguration.KMSKeyRef")
+		}
+	}
+
+	for _, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.RoleRef != nil && f0iter.RoleARN != nil {
+			return ackerr.ResourceReferenceAndIDNotSupportedFor("ReplicationConfiguration.RoleARN", "ReplicationConfiguration.RoleRef")
+		}
 	}
 	return nil
 }
@@ -160,6 +221,207 @@ func getReferencedResourceState_Key(
 	if obj.Status.ACKResourceMetadata == nil || obj.Status.ACKResourceMetadata.ARN == nil {
 		return ackerr.ResourceReferenceMissingTargetFieldFor(
 			"Key",
+			namespace, name,
+			"Status.ACKResourceMetadata.ARN")
+	}
+	return nil
+}
+
+// resolveReferenceForReplicationConfiguration_FileSystemID reads the resource referenced
+// from ReplicationConfiguration.FileSystemRef field and sets the ReplicationConfiguration.FileSystemID
+// from referenced resource. Returns a boolean indicating whether a reference
+// contains references, or an error
+func (rm *resourceManager) resolveReferenceForReplicationConfiguration_FileSystemID(
+	ctx context.Context,
+	apiReader client.Reader,
+	ko *svcapitypes.FileSystem,
+) (hasReferences bool, err error) {
+	for f0idx, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.FileSystemRef != nil && f0iter.FileSystemRef.From != nil {
+			hasReferences = true
+			arr := f0iter.FileSystemRef.From
+			if arr.Name == nil || *arr.Name == "" {
+				return hasReferences, fmt.Errorf("provided resource reference is nil or empty: ReplicationConfiguration.FileSystemRef")
+			}
+			namespace := ko.ObjectMeta.GetNamespace()
+			if arr.Namespace != nil && *arr.Namespace != "" {
+				namespace = *arr.Namespace
+			}
+			obj := &svcapitypes.FileSystem{}
+			if err := getReferencedResourceState_FileSystem(ctx, apiReader, obj, *arr.Name, namespace); err != nil {
+				return hasReferences, err
+			}
+			ko.Spec.ReplicationConfiguration[f0idx].FileSystemID = (*string)(obj.Status.FileSystemID)
+		}
+	}
+
+	return hasReferences, nil
+}
+
+// getReferencedResourceState_FileSystem looks up whether a referenced resource
+// exists and is in a ACK.ResourceSynced=True state. If the referenced resource does exist and is
+// in a Synced state, returns nil, otherwise returns `ackerr.ResourceReferenceTerminalFor` or
+// `ResourceReferenceNotSyncedFor` depending on if the resource is in a Terminal state.
+func getReferencedResourceState_FileSystem(
+	ctx context.Context,
+	apiReader client.Reader,
+	obj *svcapitypes.FileSystem,
+	name string, // the Kubernetes name of the referenced resource
+	namespace string, // the Kubernetes namespace of the referenced resource
+) error {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	err := apiReader.Get(ctx, namespacedName, obj)
+	if err != nil {
+		return err
+	}
+	var refResourceTerminal bool
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == ackv1alpha1.ConditionTypeTerminal &&
+			cond.Status == corev1.ConditionTrue {
+			return ackerr.ResourceReferenceTerminalFor(
+				"FileSystem",
+				namespace, name)
+		}
+	}
+	if refResourceTerminal {
+		return ackerr.ResourceReferenceTerminalFor(
+			"FileSystem",
+			namespace, name)
+	}
+	var refResourceSynced bool
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == ackv1alpha1.ConditionTypeResourceSynced &&
+			cond.Status == corev1.ConditionTrue {
+			refResourceSynced = true
+		}
+	}
+	if !refResourceSynced {
+		return ackerr.ResourceReferenceNotSyncedFor(
+			"FileSystem",
+			namespace, name)
+	}
+	if obj.Status.FileSystemID == nil {
+		return ackerr.ResourceReferenceMissingTargetFieldFor(
+			"FileSystem",
+			namespace, name,
+			"Status.FileSystemID")
+	}
+	return nil
+}
+
+// resolveReferenceForReplicationConfiguration_KMSKeyID reads the resource referenced
+// from ReplicationConfiguration.KMSKeyRef field and sets the ReplicationConfiguration.KMSKeyID
+// from referenced resource. Returns a boolean indicating whether a reference
+// contains references, or an error
+func (rm *resourceManager) resolveReferenceForReplicationConfiguration_KMSKeyID(
+	ctx context.Context,
+	apiReader client.Reader,
+	ko *svcapitypes.FileSystem,
+) (hasReferences bool, err error) {
+	for f0idx, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.KMSKeyRef != nil && f0iter.KMSKeyRef.From != nil {
+			hasReferences = true
+			arr := f0iter.KMSKeyRef.From
+			if arr.Name == nil || *arr.Name == "" {
+				return hasReferences, fmt.Errorf("provided resource reference is nil or empty: ReplicationConfiguration.KMSKeyRef")
+			}
+			namespace := ko.ObjectMeta.GetNamespace()
+			if arr.Namespace != nil && *arr.Namespace != "" {
+				namespace = *arr.Namespace
+			}
+			obj := &kmsapitypes.Key{}
+			if err := getReferencedResourceState_Key(ctx, apiReader, obj, *arr.Name, namespace); err != nil {
+				return hasReferences, err
+			}
+			ko.Spec.ReplicationConfiguration[f0idx].KMSKeyID = (*string)(obj.Status.ACKResourceMetadata.ARN)
+		}
+	}
+
+	return hasReferences, nil
+}
+
+// resolveReferenceForReplicationConfiguration_RoleARN reads the resource referenced
+// from ReplicationConfiguration.RoleRef field and sets the ReplicationConfiguration.RoleARN
+// from referenced resource. Returns a boolean indicating whether a reference
+// contains references, or an error
+func (rm *resourceManager) resolveReferenceForReplicationConfiguration_RoleARN(
+	ctx context.Context,
+	apiReader client.Reader,
+	ko *svcapitypes.FileSystem,
+) (hasReferences bool, err error) {
+	for f0idx, f0iter := range ko.Spec.ReplicationConfiguration {
+		if f0iter.RoleRef != nil && f0iter.RoleRef.From != nil {
+			hasReferences = true
+			arr := f0iter.RoleRef.From
+			if arr.Name == nil || *arr.Name == "" {
+				return hasReferences, fmt.Errorf("provided resource reference is nil or empty: ReplicationConfiguration.RoleRef")
+			}
+			namespace := ko.ObjectMeta.GetNamespace()
+			if arr.Namespace != nil && *arr.Namespace != "" {
+				namespace = *arr.Namespace
+			}
+			obj := &iamapitypes.Role{}
+			if err := getReferencedResourceState_Role(ctx, apiReader, obj, *arr.Name, namespace); err != nil {
+				return hasReferences, err
+			}
+			ko.Spec.ReplicationConfiguration[f0idx].RoleARN = (*string)(obj.Status.ACKResourceMetadata.ARN)
+		}
+	}
+
+	return hasReferences, nil
+}
+
+// getReferencedResourceState_Role looks up whether a referenced resource
+// exists and is in a ACK.ResourceSynced=True state. If the referenced resource does exist and is
+// in a Synced state, returns nil, otherwise returns `ackerr.ResourceReferenceTerminalFor` or
+// `ResourceReferenceNotSyncedFor` depending on if the resource is in a Terminal state.
+func getReferencedResourceState_Role(
+	ctx context.Context,
+	apiReader client.Reader,
+	obj *iamapitypes.Role,
+	name string, // the Kubernetes name of the referenced resource
+	namespace string, // the Kubernetes namespace of the referenced resource
+) error {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	err := apiReader.Get(ctx, namespacedName, obj)
+	if err != nil {
+		return err
+	}
+	var refResourceTerminal bool
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == ackv1alpha1.ConditionTypeTerminal &&
+			cond.Status == corev1.ConditionTrue {
+			return ackerr.ResourceReferenceTerminalFor(
+				"Role",
+				namespace, name)
+		}
+	}
+	if refResourceTerminal {
+		return ackerr.ResourceReferenceTerminalFor(
+			"Role",
+			namespace, name)
+	}
+	var refResourceSynced bool
+	for _, cond := range obj.Status.Conditions {
+		if cond.Type == ackv1alpha1.ConditionTypeResourceSynced &&
+			cond.Status == corev1.ConditionTrue {
+			refResourceSynced = true
+		}
+	}
+	if !refResourceSynced {
+		return ackerr.ResourceReferenceNotSyncedFor(
+			"Role",
+			namespace, name)
+	}
+	if obj.Status.ACKResourceMetadata == nil || obj.Status.ACKResourceMetadata.ARN == nil {
+		return ackerr.ResourceReferenceMissingTargetFieldFor(
+			"Role",
 			namespace, name,
 			"Status.ACKResourceMetadata.ARN")
 	}

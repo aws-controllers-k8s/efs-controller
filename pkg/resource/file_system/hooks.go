@@ -20,10 +20,12 @@ import (
 	"time"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
+	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
 	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
@@ -35,16 +37,6 @@ import (
 func getIdempotencyToken() string {
 	return fmt.Sprintf("%d", time.Now().UTC().Nanosecond())
 }
-
-var (
-	// TerminalStatuses are the status strings that are terminal states for a
-	// filesystem.
-	TerminalStatuses = []string{
-		string(svcapitypes.LifeCycleState_error),
-		string(svcapitypes.LifeCycleState_deleted),
-		string(svcapitypes.LifeCycleState_deleting),
-	}
-)
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the filesystem cannot be modified until it reaches an active status.
@@ -60,21 +52,6 @@ func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
 	)
 }
 
-// filesystemHasTerminalStatus returns whether the supplied filesystem is in a
-// terminal state
-func filesystemHasTerminalStatus(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
-	}
-	cs := *r.ko.Status.LifeCycleState
-	for _, s := range TerminalStatuses {
-		if cs == s {
-			return true
-		}
-	}
-	return false
-}
-
 // filesystemActive returns true if the supplied filesystem is in an active status
 func filesystemActive(r *resource) bool {
 	if r.ko.Status.LifeCycleState == nil {
@@ -85,26 +62,34 @@ func filesystemActive(r *resource) bool {
 	return cs == lifeCycleState
 }
 
-// filesystemCreating returns true if the supplied filesystem is in the process of
-// being created
-func filesystemCreating(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
+var (
+	// Requeue variables for different states
+	requeueWaitReplicationConfiguration = ackrequeue.NeededAfter(
+		fmt.Errorf("replication configuration is inactive, waiting for active state"),
+		15*time.Second,
+	)
+)
+
+// replicationBusy returns true if any replication destination is in a transitional state
+func replicationConfigurationActive(r *resource) bool {
+	if r.ko.Status.ReplicationConfigurationStatus == nil {
+		return true
 	}
-	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcapitypes.LifeCycleState_creating)
-	return cs == lifeCycleState
+	for _, dest := range r.ko.Status.ReplicationConfigurationStatus {
+		if dest.Status != nil {
+			status := *dest.Status
+			if status == string(svcapitypes.ReplicationStatus_ENABLING) ||
+				status == string(svcapitypes.ReplicationStatus_DELETING) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
-// filesystemDeleting returns true if the supplied filesystem is in the process of
-// being deleted
-func filesystemDeleting(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
-	}
-	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcapitypes.LifeCycleState_deleting)
-	return cs == lifeCycleState
+// replicationConfigurationExists returns true if replication configuration exists
+func replicationConfigurationExists(r *resource) bool {
+	return len(r.ko.Status.ReplicationConfigurationStatus) > 0
 }
 
 // Ideally, a part of this code needs to be generated.. However since the
@@ -133,6 +118,12 @@ func (rm *resourceManager) setResourceAdditionalFields(ctx context.Context, r *s
 
 	// Set lifecycle policies
 	r.Spec.LifecyclePolicies, err = rm.getLifecyclePolicies(ctx, r)
+	if err != nil {
+		return err
+	}
+
+	// Set replication configuration
+	err = rm.setReplicationConfiguration(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -375,4 +366,207 @@ func customPreCompare(
 	if a.ko.Spec.KMSKeyID == nil {
 		a.ko.Spec.KMSKeyID = b.ko.Spec.KMSKeyID
 	}
+
+	// EFS replication supports two modes for destination file systems. First, implicit creation where
+	// users specify only region/availabilityZone in the spec and AWS creates a new, empty destination
+	// file system with the generated fileSystemID appearing only in status (not patched back to spec).
+	// Second, explicit reference where users specify fileSystemID of an existing file system in the spec,
+	// with the existing file system requiring replication overwrite protection to be disabled so AWS can
+	// sync/overwrite the existing destination to match source data.
+	//
+	// The customPreCompare function handles both cases by adding AWS-generated fields (fileSystemID,
+	// roleARN) to prevent unnecessary update cycles while preserving user intent for explicit versus
+	// implicit destination creation.
+	if len(b.ko.Spec.ReplicationConfiguration) > 0 {
+		for i, aDest := range a.ko.Spec.ReplicationConfiguration {
+			bDest := b.ko.Spec.ReplicationConfiguration[i]
+			if aDest.FileSystemID == nil && bDest.FileSystemID != nil {
+				aDest.FileSystemID = bDest.FileSystemID
+			}
+			if aDest.RoleARN == nil && bDest.RoleARN != nil {
+				aDest.RoleARN = bDest.RoleARN
+			}
+		}
+	}
+}
+
+// setReplicationConfiguration populates both Spec and Status replication fields for the file system
+func (rm *resourceManager) setReplicationConfiguration(ctx context.Context, r *svcapitypes.FileSystem) (err error) {
+	rlog := ackrtlog.FromContext(ctx)
+	exit := rlog.Trace("rm.setReplicationConfiguration")
+	defer func() { exit(err) }()
+
+	var output *svcsdk.DescribeReplicationConfigurationsOutput
+	output, err = rm.sdkapi.DescribeReplicationConfigurations(
+		ctx,
+		&svcsdk.DescribeReplicationConfigurationsInput{
+			FileSystemId: r.Status.FileSystemID,
+		},
+	)
+	rm.metrics.RecordAPICall("GET", "DescribeReplicationConfigurations", err)
+	if err != nil {
+		if strings.Contains(err.Error(), "ReplicationNotFound") {
+			r.Spec.ReplicationConfiguration = nil
+			r.Status.ReplicationConfigurationStatus = nil
+			return nil
+		}
+		return err
+	}
+
+	if len(output.Replications) == 0 {
+		r.Spec.ReplicationConfiguration = nil
+		r.Status.ReplicationConfigurationStatus = nil
+		return nil
+	}
+
+	// Convert the first replication's destinations
+	replication := output.Replications[0]
+	specDestinations := make([]*svcapitypes.DestinationToCreate, 0, len(replication.Destinations))
+	statusDestinations := make([]*svcapitypes.Destination, 0, len(replication.Destinations))
+
+	for _, dest := range replication.Destinations {
+		specDest := &svcapitypes.DestinationToCreate{}
+		if dest.Region != nil {
+			specDest.Region = dest.Region
+		}
+		if dest.FileSystemId != nil {
+			specDest.FileSystemID = dest.FileSystemId
+		}
+		if dest.RoleArn != nil {
+			specDest.RoleARN = dest.RoleArn
+		}
+
+		specDestinations = append(specDestinations, specDest)
+
+		// Status
+		statusDest := &svcapitypes.Destination{}
+		if dest.Region != nil {
+			statusDest.Region = dest.Region
+		}
+		if dest.FileSystemId != nil {
+			statusDest.FileSystemID = dest.FileSystemId
+		}
+		if dest.OwnerId != nil {
+			statusDest.OwnerID = dest.OwnerId
+		}
+		if dest.LastReplicatedTimestamp != nil {
+			statusDest.LastReplicatedTimestamp = &metav1.Time{Time: *dest.LastReplicatedTimestamp}
+		}
+		if dest.Status != "" {
+			statusDest.Status = aws.String(string(dest.Status))
+		}
+		if dest.StatusMessage != nil {
+			statusDest.StatusMessage = dest.StatusMessage
+		}
+		if dest.RoleArn != nil {
+			statusDest.RoleARN = dest.RoleArn
+		}
+		statusDestinations = append(statusDestinations, statusDest)
+	}
+
+	r.Spec.ReplicationConfiguration = specDestinations
+	r.Status.ReplicationConfigurationStatus = statusDestinations
+	return nil
+}
+
+// syncReplicationConfiguration manages replication configuration state for the file system
+func (rm *resourceManager) syncReplicationConfiguration(ctx context.Context, desired *resource, latest *resource) (err error) {
+	rlog := ackrtlog.FromContext(ctx)
+	exit := rlog.Trace("rm.syncReplicationConfiguration")
+	defer func() { exit(err) }()
+
+	desiredHasReplication := len(desired.ko.Spec.ReplicationConfiguration) == 1
+	latestHasReplication := len(latest.ko.Spec.ReplicationConfiguration) == 1
+
+	// EFS replication configuration does not currently suppport more than one destination
+	if len(desired.ko.Spec.ReplicationConfiguration) > 1 {
+		rlog.Info("Invalid replication configuration",
+			"replicationCount", len(desired.ko.Spec.ReplicationConfiguration),
+			"replicationDestinations", desired.ko.Spec.ReplicationConfiguration)
+		msg := fmt.Errorf("EFS replication configuration only allows one replica, got %d replicas",
+			len(desired.ko.Spec.ReplicationConfiguration))
+		return ackerr.NewTerminalError(msg)
+	}
+
+	if desiredHasReplication && latestHasReplication {
+		// Delete existing then create new (AWS doesn't support direct update)
+		err = rm.deleteReplicationConfiguration(ctx, latest)
+		if err != nil {
+			return err
+		}
+		return requeueWaitReplicationConfiguration
+	}
+
+	// If desired has replication but latest doesn't, create it
+	if desiredHasReplication && !latestHasReplication {
+		err = rm.createReplicationConfiguration(ctx, desired)
+		if err != nil {
+			return err
+		}
+	}
+
+	// If desired doesn't have replication but latest does, delete it
+	if !desiredHasReplication && latestHasReplication {
+		err = rm.deleteReplicationConfiguration(ctx, desired)
+		if err != nil {
+			return err
+		}
+	}
+
+	return requeueWaitReplicationConfiguration
+}
+
+// createReplicationConfiguration creates replication configuration for the file system
+func (rm *resourceManager) createReplicationConfiguration(ctx context.Context, r *resource) (err error) {
+	rlog := ackrtlog.FromContext(ctx)
+	exit := rlog.Trace("rm.createReplicationConfiguration")
+	defer func() { exit(err) }()
+
+	// Convert DestinationToCreate to Smithy SDK format
+	destinations := make([]svcsdktypes.DestinationToCreate, 0, len(r.ko.Spec.ReplicationConfiguration))
+	for _, dest := range r.ko.Spec.ReplicationConfiguration {
+		sdkDest := svcsdktypes.DestinationToCreate{}
+		if dest.Region != nil {
+			sdkDest.Region = dest.Region
+		}
+		if dest.AvailabilityZoneName != nil {
+			sdkDest.AvailabilityZoneName = dest.AvailabilityZoneName
+		}
+		if dest.KMSKeyID != nil {
+			sdkDest.KmsKeyId = dest.KMSKeyID
+		}
+		if dest.FileSystemID != nil {
+			sdkDest.FileSystemId = dest.FileSystemID
+		}
+		if dest.RoleARN != nil {
+			sdkDest.RoleArn = dest.RoleARN
+		}
+		destinations = append(destinations, sdkDest)
+	}
+
+	_, err = rm.sdkapi.CreateReplicationConfiguration(
+		ctx,
+		&svcsdk.CreateReplicationConfigurationInput{
+			SourceFileSystemId: r.ko.Status.FileSystemID,
+			Destinations:       destinations,
+		},
+	)
+	rm.metrics.RecordAPICall("UPDATE", "CreateReplicationConfiguration", err)
+	return err
+}
+
+// deleteReplicationConfiguration deletes replication configuration for the file system
+func (rm *resourceManager) deleteReplicationConfiguration(ctx context.Context, r *resource) (err error) {
+	rlog := ackrtlog.FromContext(ctx)
+	exit := rlog.Trace("rm.deleteReplicationConfiguration")
+	defer func() { exit(err) }()
+
+	_, err = rm.sdkapi.DeleteReplicationConfiguration(
+		ctx,
+		&svcsdk.DeleteReplicationConfigurationInput{
+			SourceFileSystemId: r.ko.Status.FileSystemID,
+		},
+	)
+	rm.metrics.RecordAPICall("UPDATE", "DeleteReplicationConfiguration", err)
+	return err
 }
