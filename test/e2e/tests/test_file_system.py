@@ -76,11 +76,9 @@ def simple_file_system(efs_client):
 
     _, deleted = k8s.delete_custom_resource(
         ref,
-        period_length=DELETE_WAIT_AFTER_SECONDS,
+        period_length=(DELETE_WAIT_AFTER_SECONDS * 40),
     )
     assert deleted
-
-    time.sleep(DELETE_WAIT_AFTER_SECONDS)
 
     validator = EFSValidator(efs_client)
     assert not validator.file_system_exists(file_system_id)
@@ -232,3 +230,47 @@ class TestFileSystem:
             expected=desired_tags,
             actual=latest_tags
         )
+
+    def test_create_replication_configuration(self, efs_client, simple_file_system):
+        (ref, _, file_system_id) = simple_file_system
+        assert file_system_id is not None
+
+        validator = EFSValidator(efs_client)
+        assert validator.file_system_exists(file_system_id)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+
+        # Test adding replication configuration to us-east-1
+        replication_config = [
+            {
+                "region": "us-east-1"
+            }
+        ]
+        updates = {
+            "spec": {
+                "replicationConfiguration": replication_config,
+            },
+        }
+        k8s.patch_custom_resource(ref, updates)
+        time.sleep(UPDATE_WAIT_AFTER_SECONDS)
+
+        # Verify replication configuration was created
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+        assert validator.replication_configuration_exists(file_system_id)
+        
+        destinations = validator.get_replication_destinations(file_system_id)
+        assert len(destinations) == 1
+        assert destinations[0]['Region'] == "us-east-1"
+        assert destinations[0]['Status'] in ['ENABLED', 'ENABLING']
+        
+        # Verify the destination file system was created
+        dest_fs_id = validator.get_destination_file_system_id(file_system_id, "us-east-1")
+        assert dest_fs_id is not None
+        
+        # Check CR status reflects replication configuration
+        cr = k8s.get_resource(ref)
+        assert 'status' in cr
+        assert 'replicationConfigurationStatus' in cr['status']
+        repl_status = cr['status']['replicationConfigurationStatus']
+        assert len(repl_status) == 1
+        assert repl_status[0]['region'] == "us-east-1"
+        assert repl_status[0]['fileSystemID'] == dest_fs_id

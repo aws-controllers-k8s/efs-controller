@@ -1,3 +1,12 @@
+	// Check replication status first and requeue if deleting
+	if !filesystemActive(latest) {
+		return nil, requeueWaitState(latest)
+	}
+	
+	if !replicationConfigurationActive(latest) {
+		return nil, requeueWaitReplicationConfiguration
+	}
+
 	res := desired.ko.DeepCopy()
 	// This step Will ensure that the latest Status
 	// is patched into k8s, and user will be able
@@ -37,8 +46,15 @@
 			return &resource{res}, err
 		}
 	}
+	if delta.DifferentAt("Spec.ReplicationConfiguration") {
+		err := rm.syncReplicationConfiguration(ctx, desired, latest)
+		if err != nil {
+			return &resource{res}, err
+		}
+	}
 	// To trigger to normal update we need to make sure that at least
 	// one of the following fields are different.
 	if !delta.DifferentAt("Spec.ProvisionedThroughputInMiBps") && !delta.DifferentAt("Spec.ThroughputMode") {
 		return &resource{res}, nil
 	}
+

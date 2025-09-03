@@ -57,6 +57,29 @@ resources:
         from:
           operation: PutLifecycleConfiguration
           path: LifecyclePolicies
+      ReplicationConfiguration:
+        from:
+          operation: CreateReplicationConfiguration
+          path: Destinations
+      ReplicationConfigurationStatus:
+        is_read_only: true
+        from:
+          operation: DescribeReplicationConfigurations
+          path: Replications.Destinations
+      ReplicationConfiguration.KMSKeyID:
+        references:
+          resource: Key
+          path: Status.ACKResourceMetadata.ARN
+          service_name: kms
+      ReplicationConfiguration.FileSystemID:
+        references:
+          resource: FileSystem
+          path: Status.FileSystemID
+      ReplicationConfiguration.RoleARN:
+        references:
+          resource: Role
+          path: Status.ACKResourceMetadata.ARN
+          service_name: iam
     hooks:
       delta_pre_compare:
         code: customPreCompare(delta, a, b)
@@ -70,6 +93,8 @@ resources:
         template_path: hooks/file_system/sdk_update_pre_build_request.go.tpl
       sdk_read_many_pre_build_request:
         template_path: hooks/file_system/sdk_read_many_pre_build_request.go.tpl
+      sdk_delete_pre_build_request:
+        template_path: hooks/file_system/sdk_delete_pre_build_request.go.tpl
     print:
       add_age_column: true
       add_synced_column: true

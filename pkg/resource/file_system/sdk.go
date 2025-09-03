@@ -452,6 +452,15 @@ func (rm *resourceManager) sdkUpdate(
 	defer func() {
 		exit(err)
 	}()
+	// Check replication status first and requeue if deleting
+	if !filesystemActive(latest) {
+		return nil, requeueWaitState(latest)
+	}
+
+	if !replicationConfigurationActive(latest) {
+		return nil, requeueWaitReplicationConfiguration
+	}
+
 	res := desired.ko.DeepCopy()
 	// This step Will ensure that the latest Status
 	// is patched into k8s, and user will be able
@@ -487,6 +496,12 @@ func (rm *resourceManager) sdkUpdate(
 	}
 	if delta.DifferentAt("Spec.FileSystemProtection") {
 		err := rm.syncFilesystemProtection(ctx, desired)
+		if err != nil {
+			return &resource{res}, err
+		}
+	}
+	if delta.DifferentAt("Spec.ReplicationConfiguration") {
+		err := rm.syncReplicationConfiguration(ctx, desired, latest)
 		if err != nil {
 			return &resource{res}, err
 		}
@@ -665,6 +680,29 @@ func (rm *resourceManager) sdkDelete(
 	defer func() {
 		exit(err)
 	}()
+	// Check replication status first and requeue if deleting
+	if !filesystemActive(r) {
+		return nil, requeueWaitState(r)
+	}
+
+	if !replicationConfigurationActive(r) {
+		return nil, requeueWaitReplicationConfiguration
+	}
+
+	// Handle replication configuration deletion using sync logic
+	// Set desired state to empty for deletion and call sync
+	if replicationConfigurationExists(r) {
+		// Create a resource with empty replication config to trigger deletion
+		deleteResource := &resource{r.ko.DeepCopy()}
+		deleteResource.ko.Spec.ReplicationConfiguration = nil
+
+		err = rm.syncReplicationConfiguration(ctx, deleteResource, r)
+		if err != nil {
+			return nil, err
+		}
+		// Requeue to wait for deletion to complete
+		return nil, requeueWaitReplicationConfiguration
+	}
 	input, err := rm.newDeleteRequestPayload(r)
 	if err != nil {
 		return nil, err

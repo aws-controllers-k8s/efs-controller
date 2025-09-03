@@ -104,6 +104,14 @@ rules:
   - patch
   - update
 - apiGroups:
+  - iam.services.k8s.aws
+  resources:
+  - roles
+  - roles/status
+  verbs:
+  - get
+  - list
+- apiGroups:
   - kms.services.k8s.aws
   resources:
   - keys
