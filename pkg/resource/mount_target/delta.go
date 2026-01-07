@@ -17,16 +17,15 @@ package mount_target
 
 import (
 	"bytes"
-	"reflect"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
 	acktags "github.com/aws-controllers-k8s/runtime/pkg/tags"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 // Hack to avoid import errors during build...
 var (
 	_ = &bytes.Buffer{}
-	_ = &reflect.Method{}
 	_ = &acktags.Tags{}
 )
 
@@ -50,7 +49,7 @@ func newResourceDelta(
 			delta.Add("Spec.FileSystemID", a.ko.Spec.FileSystemID, b.ko.Spec.FileSystemID)
 		}
 	}
-	if !reflect.DeepEqual(a.ko.Spec.FileSystemRef, b.ko.Spec.FileSystemRef) {
+	if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.FileSystemRef, b.ko.Spec.FileSystemRef) {
 		delta.Add("Spec.FileSystemRef", a.ko.Spec.FileSystemRef, b.ko.Spec.FileSystemRef)
 	}
 	if ackcompare.HasNilDifference(a.ko.Spec.IPAddress, b.ko.Spec.IPAddress) {
@@ -60,7 +59,7 @@ func newResourceDelta(
 			delta.Add("Spec.IPAddress", a.ko.Spec.IPAddress, b.ko.Spec.IPAddress)
 		}
 	}
-	if !reflect.DeepEqual(a.ko.Spec.SecurityGroupRefs, b.ko.Spec.SecurityGroupRefs) {
+	if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.SecurityGroupRefs, b.ko.Spec.SecurityGroupRefs) {
 		delta.Add("Spec.SecurityGroupRefs", a.ko.Spec.SecurityGroupRefs, b.ko.Spec.SecurityGroupRefs)
 	}
 	if len(a.ko.Spec.SecurityGroups) != len(b.ko.Spec.SecurityGroups) {
@@ -77,7 +76,7 @@ func newResourceDelta(
 			delta.Add("Spec.SubnetID", a.ko.Spec.SubnetID, b.ko.Spec.SubnetID)
 		}
 	}
-	if !reflect.DeepEqual(a.ko.Spec.SubnetRef, b.ko.Spec.SubnetRef) {
+	if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.SubnetRef, b.ko.Spec.SubnetRef) {
 		delta.Add("Spec.SubnetRef", a.ko.Spec.SubnetRef, b.ko.Spec.SubnetRef)
 	}
 
