@@ -17,16 +17,15 @@ package file_system
 
 import (
 	"bytes"
-	"reflect"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
 	acktags "github.com/aws-controllers-k8s/runtime/pkg/tags"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 // Hack to avoid import errors during build...
 var (
 	_ = &bytes.Buffer{}
-	_ = &reflect.Method{}
 	_ = &acktags.Tags{}
 )
 
@@ -87,13 +86,13 @@ func newResourceDelta(
 			delta.Add("Spec.KMSKeyID", a.ko.Spec.KMSKeyID, b.ko.Spec.KMSKeyID)
 		}
 	}
-	if !reflect.DeepEqual(a.ko.Spec.KMSKeyRef, b.ko.Spec.KMSKeyRef) {
+	if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.KMSKeyRef, b.ko.Spec.KMSKeyRef) {
 		delta.Add("Spec.KMSKeyRef", a.ko.Spec.KMSKeyRef, b.ko.Spec.KMSKeyRef)
 	}
 	if len(a.ko.Spec.LifecyclePolicies) != len(b.ko.Spec.LifecyclePolicies) {
 		delta.Add("Spec.LifecyclePolicies", a.ko.Spec.LifecyclePolicies, b.ko.Spec.LifecyclePolicies)
 	} else if len(a.ko.Spec.LifecyclePolicies) > 0 {
-		if !reflect.DeepEqual(a.ko.Spec.LifecyclePolicies, b.ko.Spec.LifecyclePolicies) {
+		if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.LifecyclePolicies, b.ko.Spec.LifecyclePolicies) {
 			delta.Add("Spec.LifecyclePolicies", a.ko.Spec.LifecyclePolicies, b.ko.Spec.LifecyclePolicies)
 		}
 	}
@@ -121,7 +120,7 @@ func newResourceDelta(
 	if len(a.ko.Spec.ReplicationConfiguration) != len(b.ko.Spec.ReplicationConfiguration) {
 		delta.Add("Spec.ReplicationConfiguration", a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration)
 	} else if len(a.ko.Spec.ReplicationConfiguration) > 0 {
-		if !reflect.DeepEqual(a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration) {
+		if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration) {
 			delta.Add("Spec.ReplicationConfiguration", a.ko.Spec.ReplicationConfiguration, b.ko.Spec.ReplicationConfiguration)
 		}
 	}
