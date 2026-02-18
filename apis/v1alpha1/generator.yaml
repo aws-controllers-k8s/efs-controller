@@ -21,7 +21,6 @@ ignore:
   shape_names:
   - SecondaryGids
   - ClientToken
-model_name: elasticfilesystem
 controller_name: efs
 resources:
   FileSystem:
