@@ -60,14 +60,14 @@ type FileSystemSpec struct {
 	// KMS key. If this parameter is not specified, the default KMS key for Amazon
 	// EFS is used. You can specify a KMS key ID using the following formats:
 	//
-	//   - Key ID - A unique identifier of the key, for example 1234abcd-12ab-34cd-56ef-1234567890ab.
+	//    * Key ID - A unique identifier of the key, for example 1234abcd-12ab-34cd-56ef-1234567890ab.
 	//
-	//   - ARN - An Amazon Resource Name (ARN) for the key, for example arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab.
+	//    * ARN - An Amazon Resource Name (ARN) for the key, for example arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab.
 	//
-	//   - Key alias - A previously created display name for a key, for example
-	//     alias/projectKey1.
+	//    * Key alias - A previously created display name for a key, for example
+	//    alias/projectKey1.
 	//
-	//   - Key alias ARN - An ARN for a key alias, for example arn:aws:kms:us-west-2:444455556666:alias/projectKey1.
+	//    * Key alias ARN - An ARN for a key alias, for example arn:aws:kms:us-west-2:444455556666:alias/projectKey1.
 	//
 	// If you use KmsKeyId, you must set the CreateFileSystemRequest$Encrypted parameter
 	// to true.
@@ -82,20 +82,20 @@ type FileSystemSpec struct {
 	// object. A LifecycleConfiguration object informs lifecycle management of the
 	// following:
 	//
-	//   - TransitionToIA – When to move files in the file system from primary
-	//     storage (Standard storage class) into the Infrequent Access (IA) storage.
+	//    * TransitionToIA – When to move files in the file system from primary
+	//    storage (Standard storage class) into the Infrequent Access (IA) storage.
 	//
-	//   - TransitionToArchive – When to move files in the file system from their
-	//     current storage class (either IA or Standard storage) into the Archive
-	//     storage. File systems cannot transition into Archive storage before transitioning
-	//     into IA storage. Therefore, TransitionToArchive must either not be set
-	//     or must be later than TransitionToIA. The Archive storage class is available
-	//     only for file systems that use the Elastic throughput mode and the General
-	//     Purpose performance mode.
+	//    * TransitionToArchive – When to move files in the file system from their
+	//    current storage class (either IA or Standard storage) into the Archive
+	//    storage. File systems cannot transition into Archive storage before transitioning
+	//    into IA storage. Therefore, TransitionToArchive must either not be set
+	//    or must be later than TransitionToIA. The Archive storage class is available
+	//    only for file systems that use the Elastic throughput mode and the General
+	//    Purpose performance mode.
 	//
-	//   - TransitionToPrimaryStorageClass – Whether to move files in the file
-	//     system back to primary storage (Standard storage class) after they are
-	//     accessed in IA or Archive storage.
+	//    * TransitionToPrimaryStorageClass – Whether to move files in the file
+	//    system back to primary storage (Standard storage class) after they are
+	//    accessed in IA or Archive storage.
 	//
 	// When using the put-lifecycle-configuration CLI command or the PutLifecycleConfiguration
 	// API action, Amazon EFS requires that each LifecyclePolicy object have only
