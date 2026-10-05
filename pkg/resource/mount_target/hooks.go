@@ -16,59 +16,52 @@ package mount_target
 import (
 	"context"
 	"fmt"
-	"time"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
+	ackcondition "github.com/aws-controllers-k8s/runtime/pkg/condition"
+	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
+	corev1 "k8s.io/api/core/v1"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 )
 
-var (
-	// TerminalStatuses are the status strings that are terminal states for a
-	// mounttarget.
-	TerminalStatuses = []string{
-		string(svcapitypes.LifeCycleState_error),
-		string(svcapitypes.LifeCycleState_deleted),
-		string(svcapitypes.LifeCycleState_deleting),
-	}
+// errMountTargetInErrorState is terminal: the mounttarget has to be recreated.
+var errMountTargetInErrorState = fmt.Errorf(
+	"mounttarget is in '%s' state and cannot be modified; delete and recreate it",
+	svcapitypes.LifeCycleState_error,
 )
+
+// lifeCycleState returns the mounttarget's observed lifecycle state, or
+// "unknown" when the state has not been observed yet.
+func lifeCycleState(r *resource) string {
+	if r == nil || r.ko.Status.LifeCycleState == nil {
+		return "unknown"
+	}
+	return *r.ko.Status.LifeCycleState
+}
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the mounttarget cannot be modified until it reaches an active status.
 func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
-	if r.ko.Status.LifeCycleState == nil {
-		return nil
-	}
-	status := *r.ko.Status.LifeCycleState
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("mounttarget in '%s' state, requeuing until mounttarget is '%s'",
-			status, svcapitypes.LifeCycleState_available),
-		time.Second*10,
+			lifeCycleState(r), svcapitypes.LifeCycleState_available),
+		ackrequeue.DefaultRequeueAfterDuration,
 	)
 }
 
 // mounttargetActive returns true if the supplied mounttarget is in an active status
 func mountTargetActive(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
-	}
-	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcapitypes.LifeCycleState_available)
-	return cs == lifeCycleState
+	return lifeCycleState(r) == string(svcapitypes.LifeCycleState_available)
 }
 
-// mounttargetCreating returns true if the supplied mounttarget is in the process of
-// being created
-func mountTargetCreating(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
-	}
-	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcapitypes.LifeCycleState_creating)
-	return cs == lifeCycleState
+// mountTargetInErrorState returns true if the supplied mounttarget is in a state
+// it cannot recover from in place.
+func mountTargetInErrorState(r *resource) bool {
+	return lifeCycleState(r) == string(svcapitypes.LifeCycleState_error)
 }
 
 // setResourceDefaults queries the EFS API for the current state of the
@@ -146,9 +139,19 @@ func (rm *resourceManager) customUpdateMountTarget(
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.sdkUpdate")
 	defer func() { exit(err) }()
+	// An 'error' mounttarget never becomes modifiable again, so fail fast
+	// instead of requeuing forever.
+	if mountTargetInErrorState(latest) {
+		return nil, ackerr.NewTerminalError(errMountTargetInErrorState)
+	}
+
 	updated = rm.concreteResource(desired.DeepCopy())
 	updated.SetStatus(latest)
 	if !mountTargetActive(updated) {
+		msg := fmt.Sprintf("mounttarget cannot be modified until it is '%s'",
+			svcapitypes.LifeCycleState_available)
+		reason := lifeCycleState(updated)
+		ackcondition.SetSynced(updated, corev1.ConditionFalse, &msg, &reason)
 		return updated, requeueWaitState(updated)
 	}
 

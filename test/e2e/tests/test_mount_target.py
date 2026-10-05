@@ -91,7 +91,10 @@ class TestMountTarget:
 
         validator = EFSValidator(efs_client)
         assert validator.mount_target_exists(mount_target_id)
-        
+
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+
         cr = k8s.get_resource(ref)
         assert 'spec' in cr
         assert 'ipAddress' in cr['spec']
+        assert cr['status']['lifeCycleState'] == "available"

@@ -1,10 +1,23 @@
+	// An 'error' filesystem never becomes modifiable again, so fail fast
+	// instead of requeuing forever.
+	if filesystemInErrorState(latest) {
+		return nil, ackerr.NewTerminalError(errFilesystemInErrorState)
+	}
+
 	// Check replication status first and requeue if deleting
 	if !filesystemActive(latest) {
-		return nil, requeueWaitState(latest)
+		msg := fmt.Sprintf("filesystem cannot be modified until it is '%s'",
+			svcapitypes.LifeCycleState_available)
+		reason := lifeCycleState(latest)
+		ackcondition.SetSynced(latest, corev1.ConditionFalse, &msg, &reason)
+		return latest, requeueWaitState(latest)
 	}
-	
+
 	if !replicationConfigurationActive(latest) {
-		return nil, requeueWaitReplicationConfiguration
+		msg := "filesystem cannot be modified until its replication configuration is active"
+		reason := requeueWaitReplicationConfiguration.Error()
+		ackcondition.SetSynced(latest, corev1.ConditionFalse, &msg, &reason)
+		return latest, requeueWaitReplicationConfiguration
 	}
 
 	res := desired.ko.DeepCopy()
