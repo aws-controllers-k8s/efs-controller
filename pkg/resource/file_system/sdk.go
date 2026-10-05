@@ -452,13 +452,26 @@ func (rm *resourceManager) sdkUpdate(
 	defer func() {
 		exit(err)
 	}()
+	// An 'error' filesystem never becomes modifiable again, so fail fast
+	// instead of requeuing forever.
+	if filesystemInErrorState(latest) {
+		return nil, ackerr.NewTerminalError(errFilesystemInErrorState)
+	}
+
 	// Check replication status first and requeue if deleting
 	if !filesystemActive(latest) {
-		return nil, requeueWaitState(latest)
+		msg := fmt.Sprintf("filesystem cannot be modified until it is '%s'",
+			svcapitypes.LifeCycleState_available)
+		reason := lifeCycleState(latest)
+		ackcondition.SetSynced(latest, corev1.ConditionFalse, &msg, &reason)
+		return latest, requeueWaitState(latest)
 	}
 
 	if !replicationConfigurationActive(latest) {
-		return nil, requeueWaitReplicationConfiguration
+		msg := "filesystem cannot be modified until its replication configuration is active"
+		reason := requeueWaitReplicationConfiguration.Error()
+		ackcondition.SetSynced(latest, corev1.ConditionFalse, &msg, &reason)
+		return latest, requeueWaitReplicationConfiguration
 	}
 
 	res := desired.ko.DeepCopy()
@@ -680,11 +693,13 @@ func (rm *resourceManager) sdkDelete(
 	defer func() {
 		exit(err)
 	}()
-	// Check replication status first and requeue if deleting
-	if !filesystemActive(r) {
+	// An 'error' filesystem cannot be modified but can still be deleted, so it
+	// must not block the delete call or the finalizer would never be removed.
+	if !filesystemActive(r) && !filesystemInErrorState(r) {
 		return nil, requeueWaitState(r)
 	}
 
+	// Check replication status first and requeue if deleting
 	if !replicationConfigurationActive(r) {
 		return nil, requeueWaitReplicationConfiguration
 	}
@@ -703,6 +718,7 @@ func (rm *resourceManager) sdkDelete(
 		// Requeue to wait for deletion to complete
 		return nil, requeueWaitReplicationConfiguration
 	}
+
 	input, err := rm.newDeleteRequestPayload(r)
 	if err != nil {
 		return nil, err

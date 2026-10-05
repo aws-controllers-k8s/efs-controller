@@ -38,35 +38,46 @@ func getIdempotencyToken() string {
 	return fmt.Sprintf("%d", time.Now().UTC().Nanosecond())
 }
 
+// lifeCycleState returns the filesystem's observed lifecycle state, or
+// "unknown" when the state has not been observed yet.
+func lifeCycleState(r *resource) string {
+	if r == nil || r.ko.Status.LifeCycleState == nil {
+		return "unknown"
+	}
+	return *r.ko.Status.LifeCycleState
+}
+
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the filesystem cannot be modified until it reaches an active status.
 func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
-	if r.ko.Status.LifeCycleState == nil {
-		return nil
-	}
-	status := *r.ko.Status.LifeCycleState
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("filesystem in '%s' state, requeuing until filesystem is '%s'",
-			status, svcapitypes.LifeCycleState_available),
-		time.Second*3,
+			lifeCycleState(r), svcapitypes.LifeCycleState_available),
+		ackrequeue.DefaultRequeueAfterDuration,
 	)
 }
 
 // filesystemActive returns true if the supplied filesystem is in an active status
 func filesystemActive(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
-	}
-	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcsdktypes.LifeCycleStateAvailable)
-	return cs == lifeCycleState
+	return lifeCycleState(r) == string(svcsdktypes.LifeCycleStateAvailable)
+}
+
+// filesystemInErrorState returns true if the supplied filesystem is in a state
+// it cannot recover from in place.
+func filesystemInErrorState(r *resource) bool {
+	return lifeCycleState(r) == string(svcsdktypes.LifeCycleStateError)
 }
 
 var (
+	// errFilesystemInErrorState is terminal: the filesystem has to be recreated.
+	errFilesystemInErrorState = fmt.Errorf(
+		"filesystem is in '%s' state and cannot be modified; delete and recreate it",
+		svcapitypes.LifeCycleState_error,
+	)
 	// Requeue variables for different states
 	requeueWaitReplicationConfiguration = ackrequeue.NeededAfter(
 		fmt.Errorf("replication configuration is inactive, waiting for active state"),
-		15*time.Second,
+		ackrequeue.DefaultRequeueAfterDuration,
 	)
 )
 

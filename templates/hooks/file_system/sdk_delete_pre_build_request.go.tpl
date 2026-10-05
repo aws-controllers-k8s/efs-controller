@@ -1,8 +1,10 @@
-	// Check replication status first and requeue if deleting
-	if !filesystemActive(r) {
+	// An 'error' filesystem cannot be modified but can still be deleted, so it
+	// must not block the delete call or the finalizer would never be removed.
+	if !filesystemActive(r) && !filesystemInErrorState(r) {
 		return nil, requeueWaitState(r)
 	}
-	
+
+	// Check replication status first and requeue if deleting
 	if !replicationConfigurationActive(r) {
 		return nil, requeueWaitReplicationConfiguration
 	}
