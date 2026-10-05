@@ -20,9 +20,12 @@ import (
 	"time"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
+	ackcondition "github.com/aws-controllers-k8s/runtime/pkg/condition"
+	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	corev1 "k8s.io/api/core/v1"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
@@ -40,29 +43,41 @@ func getIdempotencyToken() string {
 // have to do this Go-fu to make it work.
 var syncTags = tags.SyncTags
 
+// lifeCycleState returns the accesspoint's observed lifecycle state, or
+// "unknown" when the state has not been observed yet.
+func lifeCycleState(r *resource) string {
+	if r == nil || r.ko.Status.LifeCycleState == nil {
+		return "unknown"
+	}
+	return *r.ko.Status.LifeCycleState
+}
+
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the accesspoint cannot be modified until it reaches an active status.
 func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
-	if r.ko.Status.LifeCycleState == nil {
-		return nil
-	}
-	status := *r.ko.Status.LifeCycleState
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("accesspoint in '%s' state, requeuing until accesspoint is '%s'",
-			status, svcapitypes.LifeCycleState_available),
-		time.Second*10,
+			lifeCycleState(r), svcapitypes.LifeCycleState_available),
+		ackrequeue.DefaultRequeueAfterDuration,
 	)
 }
 
 // accessPointActive returns true if the supplied accessPoint is in an active status
 func accessPointActive(r *resource) bool {
-	if r.ko.Status.LifeCycleState == nil {
-		return false
-	}
-	cs := *r.ko.Status.LifeCycleState
-	lifeCycleState := string(svcapitypes.LifeCycleState_available)
-	return cs == lifeCycleState
+	return lifeCycleState(r) == string(svcapitypes.LifeCycleState_available)
 }
+
+// accessPointInErrorState returns true if the supplied accessPoint is in a state
+// it cannot recover from in place.
+func accessPointInErrorState(r *resource) bool {
+	return lifeCycleState(r) == string(svcapitypes.LifeCycleState_error)
+}
+
+// errAccessPointInErrorState is terminal: the accesspoint has to be recreated.
+var errAccessPointInErrorState = fmt.Errorf(
+	"accesspoint is in '%s' state and cannot be modified; delete and recreate it",
+	svcapitypes.LifeCycleState_error,
+)
 
 // customUpdateAccessPoint updates the access point
 func (rm *resourceManager) customUpdateAccessPoint(
@@ -75,6 +90,22 @@ func (rm *resourceManager) customUpdateAccessPoint(
 	exit := rlog.Trace("rm.sdkUpdate")
 	defer func() { exit(err) }()
 
+	// An 'error' accesspoint never becomes modifiable again, so fail fast
+	// instead of requeuing forever.
+	if accessPointInErrorState(latest) {
+		return nil, ackerr.NewTerminalError(errAccessPointInErrorState)
+	}
+
+	updated = rm.concreteResource(desired.DeepCopy())
+	updated.SetStatus(latest)
+	if !accessPointActive(updated) {
+		msg := fmt.Sprintf("accesspoint cannot be modified until it is '%s'",
+			svcapitypes.LifeCycleState_available)
+		reason := lifeCycleState(updated)
+		ackcondition.SetSynced(updated, corev1.ConditionFalse, &msg, &reason)
+		return updated, requeueWaitState(updated)
+	}
+
 	if delta.DifferentAt("Spec.Tags") {
 		err := syncTags(
 			ctx, rm.sdkapi, rm.metrics,
@@ -86,7 +117,7 @@ func (rm *resourceManager) customUpdateAccessPoint(
 		}
 	}
 
-	return desired, nil
+	return updated, nil
 }
 
 var (
