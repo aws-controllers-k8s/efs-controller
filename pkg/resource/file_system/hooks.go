@@ -29,7 +29,7 @@ import (
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
 // getIdempotencyToken returns a unique string to be used in certain API calls
