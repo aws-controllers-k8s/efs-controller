@@ -49,7 +49,8 @@ resources:
           operation: PutBackupPolicy
           path: BackupPolicy
       Policy:
-        is_iam_policy: true
+        compare:
+          is_ignored: true
         from:
           operation: PutFileSystemPolicy
           path: Policy
