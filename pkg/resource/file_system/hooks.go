@@ -15,6 +15,7 @@ package file_system
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -366,6 +367,7 @@ func customPreCompare(
 	if a.ko.Spec.KMSKeyID == nil {
 		a.ko.Spec.KMSKeyID = b.ko.Spec.KMSKeyID
 	}
+	comparePolicy(delta, a, b)
 
 	// EFS replication supports two modes for destination file systems. First, implicit creation where
 	// users specify only region/availabilityZone in the spec and AWS creates a new, empty destination
@@ -388,6 +390,60 @@ func customPreCompare(
 			}
 		}
 	}
+}
+
+// comparePolicy compares file system policies, treating statements without a
+// Resource as scoped to the file system ARN, which is what EFS returns.
+// See https://docs.aws.amazon.com/efs/latest/ug/API_PutFileSystemPolicy.html#API_PutFileSystemPolicy_Examples
+func comparePolicy(delta *ackcompare.Delta, a *resource, b *resource) {
+	if ackcompare.HasNilDifference(a.ko.Spec.Policy, b.ko.Spec.Policy) {
+		delta.Add("Spec.Policy", a.ko.Spec.Policy, b.ko.Spec.Policy)
+		return
+	}
+	if a.ko.Spec.Policy == nil {
+		return
+	}
+	desired := *a.ko.Spec.Policy
+	if b.ko.Status.ACKResourceMetadata != nil && b.ko.Status.ACKResourceMetadata.ARN != nil {
+		desired = withDefaultPolicyResource(desired, string(*b.ko.Status.ACKResourceMetadata.ARN))
+	}
+	if equal, err := ackcompare.IAMPolicyDocumentEqual(desired, *b.ko.Spec.Policy); err != nil || !equal {
+		delta.Add("Spec.Policy", a.ko.Spec.Policy, b.ko.Spec.Policy)
+	}
+}
+
+// withDefaultPolicyResource returns a copy of the policy document with
+// resourceARN set on every statement that has neither Resource nor NotResource.
+func withDefaultPolicyResource(policy string, resourceARN string) string {
+	var doc map[string]interface{}
+	if err := json.Unmarshal([]byte(policy), &doc); err != nil {
+		return policy
+	}
+	var statements []interface{}
+	switch s := doc["Statement"].(type) {
+	case []interface{}:
+		statements = s
+	case map[string]interface{}:
+		statements = []interface{}{s}
+	default:
+		return policy
+	}
+	for _, s := range statements {
+		stmt, ok := s.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		_, hasResource := stmt["Resource"]
+		_, hasNotResource := stmt["NotResource"]
+		if !hasResource && !hasNotResource {
+			stmt["Resource"] = resourceARN
+		}
+	}
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return policy
+	}
+	return string(out)
 }
 
 // setReplicationConfiguration populates both Spec and Status replication fields for the file system
