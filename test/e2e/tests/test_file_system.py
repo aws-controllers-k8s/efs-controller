@@ -37,6 +37,8 @@ DELETE_WAIT_AFTER_SECONDS = 15
 def efs_policy_from_id(id: str):
     return "{\"Version\":\"2008-10-17\",\"Id\":\"1\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::637423241197:root\"},\"Action\":\"elasticfilesystem:ClientMount\",\"Resource\":\"arn:aws:elasticfilesystem:us-west-2:637423241197:file-system/FSID\"}]}".replace("FSID", id)
 
+EFS_POLICY_WITHOUT_RESOURCE = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"lt2\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"*\"},\"Action\":[\"elasticfilesystem:ClientMount\"],\"Condition\":{\"Bool\":{\"elasticfilesystem:AccessedViaMountTarget\":\"true\"}}}]}"
+
 @pytest.fixture(scope="module")
 def simple_file_system(efs_client):
     resource_name = random_suffix_name("efs", 24)
@@ -140,6 +142,20 @@ class TestFileSystem:
         observedPolicy = validator.get_file_system_policy(file_system_id)
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
         assert json.loads(policy) == json.loads(observedPolicy)
+
+        updates = {
+            "spec": {
+                "policy": EFS_POLICY_WITHOUT_RESOURCE,
+            },
+        }
+        k8s.patch_custom_resource(ref, updates)
+        time.sleep(UPDATE_WAIT_AFTER_SECONDS)
+
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+        observedPolicy = json.loads(validator.get_file_system_policy(file_system_id))
+        assert observedPolicy["Statement"][0]["Resource"].endswith(file_system_id)
+        cr = k8s.get_resource(ref)
+        assert cr["spec"]["policy"] == EFS_POLICY_WITHOUT_RESOURCE
 
         updates = {
             "spec": {

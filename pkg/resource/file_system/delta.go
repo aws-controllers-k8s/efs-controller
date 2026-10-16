@@ -103,13 +103,6 @@ func newResourceDelta(
 			delta.Add("Spec.PerformanceMode", a.ko.Spec.PerformanceMode, b.ko.Spec.PerformanceMode)
 		}
 	}
-	if ackcompare.HasNilDifference(a.ko.Spec.Policy, b.ko.Spec.Policy) {
-		delta.Add("Spec.Policy", a.ko.Spec.Policy, b.ko.Spec.Policy)
-	} else if a.ko.Spec.Policy != nil && b.ko.Spec.Policy != nil {
-		if equal, err := ackcompare.IAMPolicyDocumentEqual(*a.ko.Spec.Policy, *b.ko.Spec.Policy); err != nil || !equal {
-			delta.Add("Spec.Policy", a.ko.Spec.Policy, b.ko.Spec.Policy)
-		}
-	}
 	if ackcompare.HasNilDifference(a.ko.Spec.ProvisionedThroughputInMiBps, b.ko.Spec.ProvisionedThroughputInMiBps) {
 		delta.Add("Spec.ProvisionedThroughputInMiBps", a.ko.Spec.ProvisionedThroughputInMiBps, b.ko.Spec.ProvisionedThroughputInMiBps)
 	} else if a.ko.Spec.ProvisionedThroughputInMiBps != nil && b.ko.Spec.ProvisionedThroughputInMiBps != nil {
