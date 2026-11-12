@@ -157,6 +157,9 @@ resources:
           resource: SecurityGroup
           path: Status.ID
           service_name: ec2
+        # EFS assigns the VPC default security group when none is supplied.
+        late_initialize:
+          skip_incomplete_check: {}
     update_operation:
       custom_method_name: customUpdateMountTarget
     hooks:
@@ -205,6 +208,10 @@ resources:
         type: string
         index: 40
   AccessPoint:
+    synced:
+      when:
+        - path: Status.LifeCycleState
+          in: [ "available" ]
     fields:
       PosixUser:
         is_immutable: true
@@ -234,8 +241,6 @@ resources:
         template_path: hooks/access_point/sdk_create_post_build_request.go.tpl
       sdk_read_many_post_build_request:
         template_path: hooks/access_point/sdk_read_many_post_build_request.go.tpl
-      sdk_read_many_post_set_output:
-        template_path: hooks/access_point/sdk_read_many_post_set_output.go.tpl
     print:
       add_age_column: true
       add_synced_column: true
