@@ -264,11 +264,16 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.CreationToken = aws.String(getIdempotencyToken())
+	input.CreationToken = aws.String(getIdempotencyToken(desired))
 
 	var resp *svcsdk.CreateFileSystemOutput
 	_ = resp
 	resp, err = rm.sdkapi.CreateFileSystem(ctx, input)
+	if existing := fileSystemAlreadyCreated(desired, err); existing != nil {
+		rm.metrics.RecordAPICall("CREATE", "CreateFileSystem", err)
+		rlog.Info("file system already created for this resource, using it", "id", *existing.ko.Status.FileSystemID)
+		return existing, nil
+	}
 	rm.metrics.RecordAPICall("CREATE", "CreateFileSystem", err)
 	if err != nil {
 		return nil, err

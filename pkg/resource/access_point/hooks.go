@@ -15,6 +15,7 @@ package access_point
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -23,16 +24,43 @@ import (
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
 )
 
-// getIdempotencyToken returns a unique string to be used in certain API calls
-// to ensure no replay of the call.
-func getIdempotencyToken() string {
-	t := time.Now().UTC()
-	return t.Format("20060102150405000000")
+// getIdempotencyToken returns the ClientToken for the access point of r.
+//
+// The token is the UID of the CR, so that every Create for the CR sends the
+// same one. When the controller loses the response of a Create that went
+// through, for example because it was restarted before the access point ID
+// reached the status, the next Create gets AccessPointAlreadyExists with that
+// ID instead of creating a second access point (see accessPointAlreadyCreated).
+//
+// EFS frees the token once the access point is deleted, so the Create that
+// replaces an access point deleted outside of the controller makes a new one.
+func getIdempotencyToken(r *resource) string {
+	return string(r.ko.UID)
+}
+
+// accessPointAlreadyCreated returns desired with the ID of its access point in
+// the status when err is the AccessPointAlreadyExists error, and nil for any
+// other error.
+//
+// CreateAccessPoint returns that error for a client token it has already
+// seen. The token comes from getIdempotencyToken, so the access point was
+// created for this CR, by an earlier Create whose response was lost. The
+// returned resource carries only the ID; the reconciler reads the rest of the
+// access point right after Create.
+func accessPointAlreadyCreated(desired *resource, err error) *resource {
+	var exists *svcsdktypes.AccessPointAlreadyExists
+	if !errors.As(err, &exists) || exists.AccessPointId == nil {
+		return nil
+	}
+	ko := desired.ko.DeepCopy()
+	ko.Status.AccessPointID = exists.AccessPointId
+	return &resource{ko}
 }
 
 // Ideally, a part of this code needs to be generated.. However since the
