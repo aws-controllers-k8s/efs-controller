@@ -1,2 +1,2 @@
     // This is an idempotency token required in the API call...
-    input.ClientToken = aws.String(getIdempotencyToken())
+    input.ClientToken = getIdempotencyToken(desired)

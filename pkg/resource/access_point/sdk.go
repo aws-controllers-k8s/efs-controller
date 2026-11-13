@@ -236,11 +236,16 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.ClientToken = aws.String(getIdempotencyToken())
+	input.ClientToken = getIdempotencyToken(desired)
 
 	var resp *svcsdk.CreateAccessPointOutput
 	_ = resp
 	resp, err = rm.sdkapi.CreateAccessPoint(ctx, input)
+	if existing := accessPointAlreadyCreated(desired, err); existing != nil {
+		rm.metrics.RecordAPICall("CREATE", "CreateAccessPoint", err)
+		rlog.Info("access point already created for this resource, using it", "id", *existing.ko.Status.AccessPointID)
+		return existing, nil
+	}
 	rm.metrics.RecordAPICall("CREATE", "CreateAccessPoint", err)
 	if err != nil {
 		return nil, err

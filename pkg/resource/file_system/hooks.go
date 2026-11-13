@@ -15,6 +15,7 @@ package file_system
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -32,10 +33,43 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-// getIdempotencyToken returns a unique string to be used in certain API calls
-// to ensure no replay of the call.
-func getIdempotencyToken() string {
-	return fmt.Sprintf("%d", time.Now().UTC().Nanosecond())
+// getIdempotencyToken returns the CreationToken for the file system of r.
+//
+// The token is the UID of the CR, so that every Create for the CR sends the
+// same one. When the controller loses the response of a Create that went
+// through, for example because it was restarted before the file system ID
+// reached the status, the next Create gets FileSystemAlreadyExists with that
+// ID instead of creating a second file system (see fileSystemAlreadyCreated).
+//
+// EFS frees the token once the file system is deleted, so the Create that
+// replaces a file system deleted outside of the controller makes a new one.
+//
+// An object without a UID, such as one built by hand in a test, gets nil, and
+// the SDK fills in a random token of its own.
+func getIdempotencyToken(r *resource) *string {
+	if r.ko.UID == "" {
+		return nil
+	}
+	return aws.String(string(r.ko.UID))
+}
+
+// fileSystemAlreadyCreated returns desired with the ID of its file system in
+// the status when err is the FileSystemAlreadyExists error, and nil for any
+// other error.
+//
+// CreateFileSystem returns that error for a creation token it has already
+// seen. The token comes from getIdempotencyToken, so the file system was
+// created for this CR, by an earlier Create whose response was lost. The
+// returned resource carries only the ID; the reconciler reads the rest of the
+// file system right after Create.
+func fileSystemAlreadyCreated(desired *resource, err error) *resource {
+	var exists *svcsdktypes.FileSystemAlreadyExists
+	if !errors.As(err, &exists) || exists.FileSystemId == nil {
+		return nil
+	}
+	ko := desired.ko.DeepCopy()
+	ko.Status.FileSystemID = exists.FileSystemId
+	return &resource{ko}
 }
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
