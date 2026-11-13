@@ -40,8 +40,14 @@ import (
 //
 // EFS frees the token once the access point is deleted, so the Create that
 // replaces an access point deleted outside of the controller makes a new one.
-func getIdempotencyToken(r *resource) string {
-	return string(r.ko.UID)
+//
+// An object without a UID, such as one built by hand in a test, gets nil, and
+// the SDK fills in a random token of its own.
+func getIdempotencyToken(r *resource) *string {
+	if r.ko.UID == "" {
+		return nil
+	}
+	return aws.String(string(r.ko.UID))
 }
 
 // accessPointAlreadyCreated returns desired with the ID of its access point in

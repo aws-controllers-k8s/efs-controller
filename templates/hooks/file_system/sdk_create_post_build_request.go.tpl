@@ -1,2 +1,2 @@
     // This is an idempotency token required in the API call...
-    input.CreationToken = aws.String(getIdempotencyToken(desired))
+    input.CreationToken = getIdempotencyToken(desired)

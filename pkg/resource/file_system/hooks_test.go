@@ -90,6 +90,23 @@ func TestSdkCreate_SendsTheCRUIDAsCreationToken(t *testing.T) {
 	}
 }
 
+func TestSdkCreate_WithoutUIDLeavesTheTokenToTheSDK(t *testing.T) {
+	api := &createFileSystemAPI{
+		status: http.StatusCreated,
+		body:   `{"FileSystemId":"fs-0123456789abcdef0","LifeCycleState":"creating"}`,
+	}
+	rm := newTestManager(t, api)
+
+	r := newFileSystem(nil)
+	r.ko.UID = ""
+	if _, err := rm.sdkCreate(context.Background(), r); err != nil {
+		t.Fatalf("sdkCreate: %v", err)
+	}
+	if len(api.tokens) != 1 || api.tokens[0] == "" {
+		t.Errorf("creation tokens = %q, want one token filled in by the SDK", api.tokens)
+	}
+}
+
 func TestSdkCreate_FileSystemAlreadyCreated(t *testing.T) {
 	api := &createFileSystemAPI{
 		status: http.StatusConflict,

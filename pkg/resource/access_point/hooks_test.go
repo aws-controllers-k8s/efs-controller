@@ -91,6 +91,23 @@ func TestSdkCreate_SendsTheCRUIDAsClientToken(t *testing.T) {
 	}
 }
 
+func TestSdkCreate_WithoutUIDLeavesTheTokenToTheSDK(t *testing.T) {
+	api := &createAccessPointAPI{
+		status: http.StatusCreated,
+		body:   `{"AccessPointId":"fsap-0123456789abcdef0","FileSystemId":"fs-0123456789abcdef0","LifeCycleState":"creating"}`,
+	}
+	rm := newTestManager(t, api)
+
+	r := newAccessPoint(nil)
+	r.ko.UID = ""
+	if _, err := rm.sdkCreate(context.Background(), r); err != nil {
+		t.Fatalf("sdkCreate: %v", err)
+	}
+	if len(api.tokens) != 1 || api.tokens[0] == "" {
+		t.Errorf("client tokens = %q, want one token filled in by the SDK", api.tokens)
+	}
+}
+
 func TestSdkCreate_AccessPointAlreadyCreated(t *testing.T) {
 	api := &createAccessPointAPI{
 		status: http.StatusConflict,

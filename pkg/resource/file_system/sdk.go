@@ -264,7 +264,7 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.CreationToken = aws.String(getIdempotencyToken(desired))
+	input.CreationToken = getIdempotencyToken(desired)
 
 	var resp *svcsdk.CreateFileSystemOutput
 	_ = resp
