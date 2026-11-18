@@ -16,12 +16,15 @@ package access_point
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	ackmetrics "github.com/aws-controllers-k8s/runtime/pkg/metrics"
+	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
 
@@ -138,5 +141,64 @@ func TestSdkCreate_OtherErrorsAreReturned(t *testing.T) {
 	created, err := rm.sdkCreate(context.Background(), newAccessPoint(nil))
 	if err == nil {
 		t.Fatalf("sdkCreate returned %v and no error, want the BadRequest error", created)
+	}
+}
+
+// efsAPI serves the EFS API with a function that gets each request and returns
+// the status code, the error type for an error, and the body.
+type efsAPI func(req *http.Request) (status int, errType string, body string)
+
+func (f efsAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	status, errType, body := f(req)
+	if errType != "" {
+		w.Header().Set("X-Amzn-Errortype", errType)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = io.WriteString(w, body)
+}
+
+func accessPointJSON(id, token, state string) string {
+	return `{"AccessPointId":"` + id + `","FileSystemId":"fs-0123456789abcdef0",` +
+		`"ClientToken":"` + token + `","LifeCycleState":"` + state + `"}`
+}
+
+// The response of a Create that went through was lost, the retry gets
+// AccessPointAlreadyExists, and the access point is still being created: the
+// read right after Create must ask for a requeue that waits, not for none.
+func TestReadOne_AfterAccessPointAlreadyExistsWhileCreating_Requeues(t *testing.T) {
+	const id = "fsap-0123456789abcdef0"
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		switch {
+		case req.Method == http.MethodPost:
+			return http.StatusConflict, "AccessPointAlreadyExists",
+				`{"ErrorCode":"AccessPointAlreadyExists","Message":"exists","AccessPointId":"` + id + `"}`
+		case req.URL.Query().Get("AccessPointId") == id:
+			return http.StatusOK, "", `{"AccessPoints":[` + accessPointJSON(id, testUID, "creating") + `]}`
+		}
+		t.Errorf("unexpected request %s %s", req.Method, req.URL)
+		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
+	}))
+	ctx := context.Background()
+
+	created, err := rm.Create(ctx, newAccessPoint(nil))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	_, err = rm.ReadOne(ctx, created)
+
+	var requeue *ackrequeue.RequeueNeededAfter
+	if !errors.As(err, &requeue) || requeue == nil || requeue.Duration() <= 0 {
+		t.Fatalf("ReadOne error = %#v, want a requeue after a non-zero duration", err)
+	}
+	if !strings.Contains(requeue.Error(), "'creating'") {
+		t.Errorf("requeue message = %q, want the observed state 'creating'", requeue.Error())
+	}
+}
+
+func TestRequeueWaitState_WithoutStateStillRequeues(t *testing.T) {
+	requeue := requeueWaitState(newAccessPoint(nil))
+	if requeue == nil || requeue.Duration() <= 0 {
+		t.Fatalf("requeueWaitState = %#v, want a requeue after a non-zero duration", requeue)
 	}
 }

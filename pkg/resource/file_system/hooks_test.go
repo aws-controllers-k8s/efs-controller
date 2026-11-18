@@ -139,3 +139,10 @@ func TestSdkCreate_OtherErrorsAreReturned(t *testing.T) {
 		t.Fatalf("sdkCreate returned %v and no error, want the BadRequest error", created)
 	}
 }
+
+func TestRequeueWaitState_WithoutStateStillRequeues(t *testing.T) {
+	requeue := requeueWaitState(newFileSystem(nil))
+	if requeue == nil || requeue.Duration() <= 0 {
+		t.Fatalf("requeueWaitState = %#v, want a requeue after a non-zero duration", requeue)
+	}
+}

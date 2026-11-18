@@ -186,7 +186,7 @@ func (rm *resourceManager) sdkFind(
 
 	rm.setStatusDefaults(ko)
 	if !accessPointActive(&resource{ko}) {
-		return &resource{ko}, requeueWaitState(r)
+		return &resource{ko}, requeueWaitState(&resource{ko})
 	}
 
 	return &resource{ko}, nil

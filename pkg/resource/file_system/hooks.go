@@ -74,11 +74,15 @@ func fileSystemAlreadyCreated(desired *resource, err error) *resource {
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the filesystem cannot be modified until it reaches an active status.
+//
+// It never returns nil. Callers return it as an error, and an error that
+// holds a nil *RequeueNeededAfter is not nil but asks for a requeue after 0s,
+// that is, for none.
 func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
-	if r.ko.Status.LifeCycleState == nil {
-		return nil
+	status := "unknown"
+	if r.ko.Status.LifeCycleState != nil {
+		status = *r.ko.Status.LifeCycleState
 	}
-	status := *r.ko.Status.LifeCycleState
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("filesystem in '%s' state, requeuing until filesystem is '%s'",
 			status, svcapitypes.LifeCycleState_available),
