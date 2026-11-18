@@ -24,6 +24,7 @@ import (
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
 	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
@@ -35,8 +36,10 @@ import (
 // The token is the UID of the CR, so that every Create for the CR sends the
 // same one. When the controller loses the response of a Create that went
 // through, for example because it was restarted before the access point ID
-// reached the status, the next Create gets AccessPointAlreadyExists with that
-// ID instead of creating a second access point (see accessPointAlreadyCreated).
+// reached the status, the next read finds the access point by the token (see
+// withAccessPointIDFromToken), and a Create that runs anyway gets
+// AccessPointAlreadyExists with its ID (see accessPointAlreadyCreated) instead
+// of creating a second access point.
 //
 // EFS frees the token once the access point is deleted, so the Create that
 // replaces an access point deleted outside of the controller makes a new one.
@@ -67,6 +70,47 @@ func accessPointAlreadyCreated(desired *resource, err error) *resource {
 	ko := desired.ko.DeepCopy()
 	ko.Status.AccessPointID = exists.AccessPointId
 	return &resource{ko}
+}
+
+// withAccessPointIDFromToken returns r with the ID of its access point in the
+// status, when the status has no ID and an access point of spec.fileSystemID
+// carries the client token of r. Otherwise it returns r unchanged.
+//
+// The status has no ID when the controller lost the response of a Create that
+// went through, for example because it was restarted before the ID reached the
+// status. Without the ID, the read would return NotFound: a Create would get
+// AccessPointAlreadyExists (see accessPointAlreadyCreated), but a CR deleted
+// meanwhile would lose its finalizer and leave the access point behind.
+func (rm *resourceManager) withAccessPointIDFromToken(
+	ctx context.Context,
+	r *resource,
+) (*resource, error) {
+	token := getIdempotencyToken(r)
+	if token == nil || r.ko.Spec.FileSystemID == nil {
+		return r, nil
+	}
+	paginator := svcsdk.NewDescribeAccessPointsPaginator(rm.sdkapi, &svcsdk.DescribeAccessPointsInput{
+		FileSystemId: r.ko.Spec.FileSystemID,
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		rm.metrics.RecordAPICall("READ_MANY", "DescribeAccessPoints", err)
+		if err != nil {
+			var notFound *svcsdktypes.FileSystemNotFound
+			if errors.As(err, &notFound) {
+				return r, nil
+			}
+			return nil, err
+		}
+		for _, ap := range page.AccessPoints {
+			if ap.AccessPointId != nil && ap.ClientToken != nil && *ap.ClientToken == *token {
+				ko := r.ko.DeepCopy()
+				ko.Status.AccessPointID = ap.AccessPointId
+				return &resource{ko}, nil
+			}
+		}
+	}
+	return r, nil
 }
 
 // Ideally, a part of this code needs to be generated.. However since the

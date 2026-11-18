@@ -19,8 +19,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackmetrics "github.com/aws-controllers-k8s/runtime/pkg/metrics"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
@@ -140,9 +142,87 @@ func TestSdkCreate_OtherErrorsAreReturned(t *testing.T) {
 	}
 }
 
+// efsAPI serves the EFS API with a function that gets each request and returns
+// the status code, the error type for an error, and the body.
+type efsAPI func(req *http.Request) (status int, errType string, body string)
+
+func (f efsAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	status, errType, body := f(req)
+	if errType != "" {
+		w.Header().Set("X-Amzn-Errortype", errType)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = io.WriteString(w, body)
+}
+
 func TestRequeueWaitState_WithoutStateStillRequeues(t *testing.T) {
 	requeue := requeueWaitState(newFileSystem(nil))
 	if requeue == nil || requeue.Duration() <= 0 {
 		t.Fatalf("requeueWaitState = %#v, want a requeue after a non-zero duration", requeue)
+	}
+}
+
+// The status has no ID, for example because the controller lost the response
+// of a Create that went through. The read finds the file system by the CR UID
+// as its creation token, so a delete of the CR deletes it too.
+func TestSdkFind_WithoutIDFindsTheFileSystemByCreationToken(t *testing.T) {
+	const id = "fs-0123456789abcdef0"
+	fileSystem := `{"FileSystems":[{"FileSystemId":"` + id + `","CreationToken":"` + testUID + `",` +
+		`"LifeCycleState":"creating","PerformanceMode":"generalPurpose"}]}`
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		q := req.URL.Query()
+		switch {
+		case req.URL.Path == "/2015-02-01/file-systems" && q.Get("CreationToken") == testUID:
+			return http.StatusOK, "", fileSystem
+		case req.URL.Path == "/2015-02-01/file-systems" && q.Get("FileSystemId") == id:
+			return http.StatusOK, "", fileSystem
+		// The policies and the replication configuration of the file system.
+		case strings.HasSuffix(req.URL.Path, "/policy"):
+			return http.StatusNotFound, "PolicyNotFound", `{"ErrorCode":"PolicyNotFound","Message":"none"}`
+		case strings.HasSuffix(req.URL.Path, "/backup-policy"):
+			return http.StatusOK, "", `{"BackupPolicy":{"Status":"DISABLED"}}`
+		case strings.HasSuffix(req.URL.Path, "/lifecycle-configuration"):
+			return http.StatusOK, "", `{"LifecyclePolicies":[]}`
+		case strings.HasSuffix(req.URL.Path, "/replication-configurations"):
+			return http.StatusOK, "", `{"Replications":[]}`
+		}
+		t.Errorf("unexpected request %s %s", req.Method, req.URL)
+		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
+	}))
+
+	found, err := rm.sdkFind(context.Background(), newFileSystem(nil))
+	if err != nil {
+		t.Fatalf("sdkFind: %v", err)
+	}
+	if got := found.ko.Status.FileSystemID; got == nil || *got != id {
+		t.Errorf("FileSystemID = %v, want %s", got, id)
+	}
+}
+
+func TestSdkFind_WithoutIDAndNoFileSystemWithTheToken_NotFound(t *testing.T) {
+	var tokens []string
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		tokens = append(tokens, req.URL.Query().Get("CreationToken"))
+		return http.StatusOK, "", `{"FileSystems":[]}`
+	}))
+
+	if _, err := rm.sdkFind(context.Background(), newFileSystem(nil)); err != ackerr.NotFound {
+		t.Errorf("sdkFind error = %v, want NotFound", err)
+	}
+	if len(tokens) != 1 || tokens[0] != testUID {
+		t.Errorf("creation tokens looked up = %q, want the CR UID %q once", tokens, testUID)
+	}
+}
+
+func TestSdkFind_WithoutIDAndUIDSendsNoRequest(t *testing.T) {
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		t.Errorf("unexpected request %s %s", req.Method, req.URL)
+		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
+	}))
+	r := newFileSystem(nil)
+	r.ko.UID = ""
+	if _, err := rm.sdkFind(context.Background(), r); err != ackerr.NotFound {
+		t.Errorf("sdkFind error = %v, want NotFound", err)
 	}
 }

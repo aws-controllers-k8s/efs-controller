@@ -67,6 +67,11 @@ func (rm *resourceManager) sdkFind(
 		msg := fmt.Errorf("field Backup is a NO-OP field. Set BackupPolicy.Status instead")
 		return nil, ackerr.NewTerminalError(msg)
 	}
+	if r.ko.Status.FileSystemID == nil {
+		if r, err = rm.withFileSystemIDFromToken(ctx, r); err != nil {
+			return nil, err
+		}
+	}
 	// If any required fields in the input shape are missing, AWS resource is
 	// not created yet. Return NotFound here to indicate to callers that the
 	// resource isn't yet created.

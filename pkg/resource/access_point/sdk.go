@@ -63,6 +63,11 @@ func (rm *resourceManager) sdkFind(
 	defer func() {
 		exit(err)
 	}()
+	if r.ko.Status.AccessPointID == nil {
+		if r, err = rm.withAccessPointIDFromToken(ctx, r); err != nil {
+			return nil, err
+		}
+	}
 	// If any required fields in the input shape are missing, AWS resource is
 	// not created yet. Return NotFound here to indicate to callers that the
 	// resource isn't yet created.

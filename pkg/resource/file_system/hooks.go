@@ -38,8 +38,10 @@ import (
 // The token is the UID of the CR, so that every Create for the CR sends the
 // same one. When the controller loses the response of a Create that went
 // through, for example because it was restarted before the file system ID
-// reached the status, the next Create gets FileSystemAlreadyExists with that
-// ID instead of creating a second file system (see fileSystemAlreadyCreated).
+// reached the status, the next read finds the file system by the token (see
+// withFileSystemIDFromToken), and a Create that runs anyway gets
+// FileSystemAlreadyExists with its ID (see fileSystemAlreadyCreated) instead of
+// creating a second file system.
 //
 // EFS frees the token once the file system is deleted, so the Create that
 // replaces a file system deleted outside of the controller makes a new one.
@@ -70,6 +72,44 @@ func fileSystemAlreadyCreated(desired *resource, err error) *resource {
 	ko := desired.ko.DeepCopy()
 	ko.Status.FileSystemID = exists.FileSystemId
 	return &resource{ko}
+}
+
+// withFileSystemIDFromToken returns r with the ID of its file system in the
+// status, when the status has no ID and a file system carries the creation
+// token of r. Otherwise it returns r unchanged.
+//
+// The status has no ID when the controller lost the response of a Create that
+// went through, for example because it was restarted before the ID reached the
+// status. Without the ID, the read would return NotFound: a Create would get
+// FileSystemAlreadyExists (see fileSystemAlreadyCreated), but a CR deleted
+// meanwhile would lose its finalizer and leave the file system behind.
+func (rm *resourceManager) withFileSystemIDFromToken(
+	ctx context.Context,
+	r *resource,
+) (*resource, error) {
+	token := getIdempotencyToken(r)
+	if token == nil {
+		return r, nil
+	}
+	resp, err := rm.sdkapi.DescribeFileSystems(ctx, &svcsdk.DescribeFileSystemsInput{
+		CreationToken: token,
+	})
+	rm.metrics.RecordAPICall("READ_MANY", "DescribeFileSystems", err)
+	if err != nil {
+		var notFound *svcsdktypes.FileSystemNotFound
+		if errors.As(err, &notFound) {
+			return r, nil
+		}
+		return nil, err
+	}
+	for _, fs := range resp.FileSystems {
+		if fs.FileSystemId != nil {
+			ko := r.ko.DeepCopy()
+			ko.Status.FileSystemID = fs.FileSystemId
+			return &resource{ko}, nil
+		}
+	}
+	return r, nil
 }
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct

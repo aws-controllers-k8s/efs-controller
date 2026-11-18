@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	ackerr "github.com/aws-controllers-k8s/runtime/pkg/errors"
 	ackmetrics "github.com/aws-controllers-k8s/runtime/pkg/metrics"
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -200,5 +201,67 @@ func TestRequeueWaitState_WithoutStateStillRequeues(t *testing.T) {
 	requeue := requeueWaitState(newAccessPoint(nil))
 	if requeue == nil || requeue.Duration() <= 0 {
 		t.Fatalf("requeueWaitState = %#v, want a requeue after a non-zero duration", requeue)
+	}
+}
+
+// The status has no ID, for example because the controller lost the response
+// of a Create that went through. The read finds the access point by the CR UID
+// as its client token, so a delete of the CR deletes it too.
+func TestSdkFind_WithoutIDFindsTheAccessPointByClientToken(t *testing.T) {
+	const id = "fsap-0123456789abcdef0"
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		q := req.URL.Query()
+		switch {
+		case q.Get("FileSystemId") == "fs-0123456789abcdef0":
+			return http.StatusOK, "", `{"AccessPoints":[` +
+				accessPointJSON("fsap-0aaaaaaaaaaaaaaaa", "another-token", "available") + `,` +
+				accessPointJSON(id, testUID, "available") + `]}`
+		case q.Get("AccessPointId") == id:
+			return http.StatusOK, "", `{"AccessPoints":[` + accessPointJSON(id, testUID, "available") + `]}`
+		}
+		t.Errorf("unexpected request %s %s", req.Method, req.URL)
+		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
+	}))
+
+	found, err := rm.sdkFind(context.Background(), newAccessPoint(nil))
+	if err != nil {
+		t.Fatalf("sdkFind: %v", err)
+	}
+	if got := found.ko.Status.AccessPointID; got == nil || *got != id {
+		t.Errorf("AccessPointID = %v, want %s", got, id)
+	}
+}
+
+func TestSdkFind_WithoutIDAndNoAccessPointWithTheToken_NotFound(t *testing.T) {
+	for name, answer := range map[string]struct {
+		status        int
+		errType, body string
+	}{
+		"other tokens only": {http.StatusOK, "", `{"AccessPoints":[` +
+			accessPointJSON("fsap-0aaaaaaaaaaaaaaaa", "another-token", "available") + `]}`},
+		"file system gone": {http.StatusNotFound, "FileSystemNotFound",
+			`{"ErrorCode":"FileSystemNotFound","Message":"gone"}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+				return answer.status, answer.errType, answer.body
+			}))
+			_, err := rm.sdkFind(context.Background(), newAccessPoint(nil))
+			if err != ackerr.NotFound {
+				t.Errorf("sdkFind error = %v, want NotFound", err)
+			}
+		})
+	}
+}
+
+func TestSdkFind_WithoutIDAndUIDSendsNoRequest(t *testing.T) {
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		t.Errorf("unexpected request %s %s", req.Method, req.URL)
+		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
+	}))
+	r := newAccessPoint(nil)
+	r.ko.UID = ""
+	if _, err := rm.sdkFind(context.Background(), r); err != ackerr.NotFound {
+		t.Errorf("sdkFind error = %v, want NotFound", err)
 	}
 }
