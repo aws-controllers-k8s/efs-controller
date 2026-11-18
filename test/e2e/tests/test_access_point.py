@@ -19,6 +19,7 @@ import time
 import logging
 
 from acktest.resources import random_suffix_name
+from acktest import tags
 from acktest.k8s import resource as k8s
 
 from e2e import service_marker, CRD_GROUP, CRD_VERSION, load_efs_resource
@@ -30,6 +31,7 @@ from .test_file_system import simple_file_system
 RESOURCE_PLURAL = "accesspoints"
 
 CREATE_WAIT_AFTER_SECONDS = 15
+UPDATE_WAIT_AFTER_SECONDS = 30
 DELETE_WAIT_AFTER_SECONDS = 15
 
 @pytest.fixture(scope="module")
@@ -83,8 +85,45 @@ def simple_access_point(efs_client, simple_file_system):
 @pytest.mark.canary
 class TestAccessPoint:
     def test_create_delete(self, efs_client, simple_access_point):
-        (_, _, access_point_id) = simple_access_point
+        (ref, _, access_point_id) = simple_access_point
         assert access_point_id is not None
 
         validator = EFSValidator(efs_client)
         assert validator.access_point_exists(access_point_id)
+
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+
+        cr = k8s.get_resource(ref)
+        assert cr['status']['lifeCycleState'] == "available"
+
+    def test_update_tags(self, efs_client, simple_access_point):
+        (ref, _, access_point_id) = simple_access_point
+        assert access_point_id is not None
+
+        validator = EFSValidator(efs_client)
+        assert validator.access_point_exists(access_point_id)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+
+        desired_tags = [{
+            "key": "Name",
+            "value": "foobar"
+        }]
+        updates = {
+            "spec": {
+                "tags": desired_tags,
+            },
+        }
+        k8s.patch_custom_resource(ref, updates)
+        time.sleep(UPDATE_WAIT_AFTER_SECONDS)
+
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=5)
+
+        ap = validator.get_access_point(access_point_id)
+        assert ap is not None
+        latest_tags = ap["Tags"]
+
+        desired_tags = [{"Key": d["key"], "Value": d["value"]} for d in desired_tags]
+        tags.assert_equal_without_ack_tags(
+            expected=desired_tags,
+            actual=latest_tags
+        )
