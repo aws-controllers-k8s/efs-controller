@@ -36,10 +36,10 @@ import (
 // The token is the UID of the CR, so that every Create for the CR sends the
 // same one. When the controller loses the response of a Create that went
 // through, for example because it was restarted before the access point ID
-// reached the status, the next read finds the access point by the token (see
-// withAccessPointIDFromToken), and a Create that runs anyway gets
-// AccessPointAlreadyExists with its ID (see accessPointAlreadyCreated) instead
-// of creating a second access point.
+// reached the status, the next Create gets AccessPointAlreadyExists with its
+// ID (see accessPointAlreadyCreated) instead of creating a second access
+// point, and a delete of the CR finds the access point by the token (see
+// withAccessPointIDFromToken).
 //
 // EFS frees the token once the access point is deleted, so the Create that
 // replaces an access point deleted outside of the controller makes a new one.
@@ -73,20 +73,30 @@ func accessPointAlreadyCreated(desired *resource, err error) *resource {
 }
 
 // withAccessPointIDFromToken returns r with the ID of its access point in the
-// status, when the status has no ID and an access point of spec.fileSystemID
-// carries the client token of r. Otherwise it returns r unchanged.
+// status, when r is being deleted, the status has no ID and an access point of
+// spec.fileSystemID carries the client token of r. Otherwise it returns r
+// unchanged.
 //
 // The status has no ID when the controller lost the response of a Create that
 // went through, for example because it was restarted before the ID reached the
-// status. Without the ID, the read would return NotFound: a Create would get
-// AccessPointAlreadyExists (see accessPointAlreadyCreated), but a CR deleted
+// status. Without the ID, the read would return NotFound, and a CR deleted
 // meanwhile would lose its finalizer and leave the access point behind.
+//
+// The lookup pages through every access point of the file system, which can
+// hold thousands of them, so it runs only for a CR being deleted. Any other
+// read leaves the ID to the Create that follows NotFound: it gets
+// AccessPointAlreadyExists with the ID (see accessPointAlreadyCreated).
+//
+// The runtime ignores reference errors on delete, so for a CR that uses
+// fileSystemRef, spec.fileSystemID is empty when the referenced FileSystem is
+// already gone or not synced. The lookup is skipped then, and an access point
+// whose Create response was lost is left behind.
 func (rm *resourceManager) withAccessPointIDFromToken(
 	ctx context.Context,
 	r *resource,
 ) (*resource, error) {
 	token := getIdempotencyToken(r)
-	if token == nil || r.ko.Spec.FileSystemID == nil {
+	if !r.IsBeingDeleted() || token == nil || r.ko.Spec.FileSystemID == nil {
 		return r, nil
 	}
 	paginator := svcsdk.NewDescribeAccessPointsPaginator(rm.sdkapi, &svcsdk.DescribeAccessPointsInput{

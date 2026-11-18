@@ -28,6 +28,7 @@ import (
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 )
@@ -76,6 +77,14 @@ func newAccessPoint(id *string) *resource {
 	ko.Spec.FileSystemID = aws.String("fs-0123456789abcdef0")
 	ko.Status.AccessPointID = id
 	return &resource{ko}
+}
+
+// beingDeleted returns r with a deletion timestamp, as the runtime passes it
+// to the read before a delete.
+func beingDeleted(r *resource) *resource {
+	now := metav1.Now()
+	r.ko.DeletionTimestamp = &now
+	return r
 }
 
 func TestSdkCreate_SendsTheCRUIDAsClientToken(t *testing.T) {
@@ -205,9 +214,9 @@ func TestRequeueWaitState_WithoutStateStillRequeues(t *testing.T) {
 }
 
 // The status has no ID, for example because the controller lost the response
-// of a Create that went through. The read finds the access point by the CR UID
-// as its client token, so a delete of the CR deletes it too.
-func TestSdkFind_WithoutIDFindsTheAccessPointByClientToken(t *testing.T) {
+// of a Create that went through. The read before a delete finds the access
+// point by the CR UID as its client token, so the delete deletes it too.
+func TestSdkFind_BeingDeletedWithoutIDFindsTheAccessPointByClientToken(t *testing.T) {
 	const id = "fsap-0123456789abcdef0"
 	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
 		q := req.URL.Query()
@@ -223,7 +232,7 @@ func TestSdkFind_WithoutIDFindsTheAccessPointByClientToken(t *testing.T) {
 		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
 	}))
 
-	found, err := rm.sdkFind(context.Background(), newAccessPoint(nil))
+	found, err := rm.sdkFind(context.Background(), beingDeleted(newAccessPoint(nil)))
 	if err != nil {
 		t.Fatalf("sdkFind: %v", err)
 	}
@@ -232,7 +241,7 @@ func TestSdkFind_WithoutIDFindsTheAccessPointByClientToken(t *testing.T) {
 	}
 }
 
-func TestSdkFind_WithoutIDAndNoAccessPointWithTheToken_NotFound(t *testing.T) {
+func TestSdkFind_BeingDeletedWithoutIDAndNoAccessPointWithTheToken_NotFound(t *testing.T) {
 	for name, answer := range map[string]struct {
 		status        int
 		errType, body string
@@ -246,7 +255,7 @@ func TestSdkFind_WithoutIDAndNoAccessPointWithTheToken_NotFound(t *testing.T) {
 			rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
 				return answer.status, answer.errType, answer.body
 			}))
-			_, err := rm.sdkFind(context.Background(), newAccessPoint(nil))
+			_, err := rm.sdkFind(context.Background(), beingDeleted(newAccessPoint(nil)))
 			if err != ackerr.NotFound {
 				t.Errorf("sdkFind error = %v, want NotFound", err)
 			}
@@ -259,9 +268,23 @@ func TestSdkFind_WithoutIDAndUIDSendsNoRequest(t *testing.T) {
 		t.Errorf("unexpected request %s %s", req.Method, req.URL)
 		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
 	}))
-	r := newAccessPoint(nil)
+	r := beingDeleted(newAccessPoint(nil))
 	r.ko.UID = ""
 	if _, err := rm.sdkFind(context.Background(), r); err != ackerr.NotFound {
+		t.Errorf("sdkFind error = %v, want NotFound", err)
+	}
+}
+
+// A read without an ID for a CR that is not being deleted, such as the first
+// reconcile of a new access point or a retry of a failing Create, does not
+// page through the access points of the file system: the Create that follows
+// NotFound gets the ID from AccessPointAlreadyExists.
+func TestSdkFind_WithoutIDAndNotBeingDeletedSendsNoRequest(t *testing.T) {
+	rm := newTestManager(t, efsAPI(func(req *http.Request) (int, string, string) {
+		t.Errorf("unexpected request %s %s", req.Method, req.URL)
+		return http.StatusBadRequest, "BadRequest", `{"ErrorCode":"BadRequest"}`
+	}))
+	if _, err := rm.sdkFind(context.Background(), newAccessPoint(nil)); err != ackerr.NotFound {
 		t.Errorf("sdkFind error = %v, want NotFound", err)
 	}
 }
