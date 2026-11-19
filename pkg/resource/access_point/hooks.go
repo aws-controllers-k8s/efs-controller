@@ -15,6 +15,7 @@ package access_point
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -23,16 +24,103 @@ import (
 	ackrequeue "github.com/aws-controllers-k8s/runtime/pkg/requeue"
 	ackrtlog "github.com/aws-controllers-k8s/runtime/pkg/runtime/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	svcsdk "github.com/aws/aws-sdk-go-v2/service/efs"
+	svcsdktypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	svcapitypes "github.com/aws-controllers-k8s/efs-controller/apis/v1alpha1"
 	"github.com/aws-controllers-k8s/efs-controller/pkg/tags"
 )
 
-// getIdempotencyToken returns a unique string to be used in certain API calls
-// to ensure no replay of the call.
-func getIdempotencyToken() string {
-	t := time.Now().UTC()
-	return t.Format("20060102150405000000")
+// getIdempotencyToken returns the ClientToken for the access point of r.
+//
+// The token is the UID of the CR, so that every Create for the CR sends the
+// same one. When the controller loses the response of a Create that went
+// through, for example because it was restarted before the access point ID
+// reached the status, the next Create gets AccessPointAlreadyExists with its
+// ID (see accessPointAlreadyCreated) instead of creating a second access
+// point, and a delete of the CR finds the access point by the token (see
+// withAccessPointIDFromToken).
+//
+// EFS frees the token once the access point is deleted, so the Create that
+// replaces an access point deleted outside of the controller makes a new one.
+//
+// An object without a UID, such as one built by hand in a test, gets nil, and
+// the SDK fills in a random token of its own.
+func getIdempotencyToken(r *resource) *string {
+	if r.ko.UID == "" {
+		return nil
+	}
+	return aws.String(string(r.ko.UID))
+}
+
+// accessPointAlreadyCreated returns desired with the ID of its access point in
+// the status when err is the AccessPointAlreadyExists error, and nil for any
+// other error.
+//
+// CreateAccessPoint returns that error for a client token it has already
+// seen. The token comes from getIdempotencyToken, so the access point was
+// created for this CR, by an earlier Create whose response was lost. The
+// returned resource carries only the ID; the reconciler reads the rest of the
+// access point right after Create.
+func accessPointAlreadyCreated(desired *resource, err error) *resource {
+	var exists *svcsdktypes.AccessPointAlreadyExists
+	if !errors.As(err, &exists) || exists.AccessPointId == nil {
+		return nil
+	}
+	ko := desired.ko.DeepCopy()
+	ko.Status.AccessPointID = exists.AccessPointId
+	return &resource{ko}
+}
+
+// withAccessPointIDFromToken returns r with the ID of its access point in the
+// status, when r is being deleted, the status has no ID and an access point of
+// spec.fileSystemID carries the client token of r. Otherwise it returns r
+// unchanged.
+//
+// The status has no ID when the controller lost the response of a Create that
+// went through, for example because it was restarted before the ID reached the
+// status. Without the ID, the read would return NotFound, and a CR deleted
+// meanwhile would lose its finalizer and leave the access point behind.
+//
+// The lookup pages through every access point of the file system, which can
+// hold thousands of them, so it runs only for a CR being deleted. Any other
+// read leaves the ID to the Create that follows NotFound: it gets
+// AccessPointAlreadyExists with the ID (see accessPointAlreadyCreated).
+//
+// The runtime ignores reference errors on delete, so for a CR that uses
+// fileSystemRef, spec.fileSystemID is empty when the referenced FileSystem is
+// already gone or not synced. The lookup is skipped then, and an access point
+// whose Create response was lost is left behind.
+func (rm *resourceManager) withAccessPointIDFromToken(
+	ctx context.Context,
+	r *resource,
+) (*resource, error) {
+	token := getIdempotencyToken(r)
+	if !r.IsBeingDeleted() || token == nil || r.ko.Spec.FileSystemID == nil {
+		return r, nil
+	}
+	paginator := svcsdk.NewDescribeAccessPointsPaginator(rm.sdkapi, &svcsdk.DescribeAccessPointsInput{
+		FileSystemId: r.ko.Spec.FileSystemID,
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		rm.metrics.RecordAPICall("READ_MANY", "DescribeAccessPoints", err)
+		if err != nil {
+			var notFound *svcsdktypes.FileSystemNotFound
+			if errors.As(err, &notFound) {
+				return r, nil
+			}
+			return nil, err
+		}
+		for _, ap := range page.AccessPoints {
+			if ap.AccessPointId != nil && ap.ClientToken != nil && *ap.ClientToken == *token {
+				ko := r.ko.DeepCopy()
+				ko.Status.AccessPointID = ap.AccessPointId
+				return &resource{ko}, nil
+			}
+		}
+	}
+	return r, nil
 }
 
 // Ideally, a part of this code needs to be generated.. However since the
@@ -42,11 +130,15 @@ var syncTags = tags.SyncTags
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the accesspoint cannot be modified until it reaches an active status.
+//
+// It never returns nil. Callers return it as an error, and an error that
+// holds a nil *RequeueNeededAfter is not nil but asks for a requeue after 0s,
+// that is, for none.
 func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
-	if r.ko.Status.LifeCycleState == nil {
-		return nil
+	status := "unknown"
+	if r.ko.Status.LifeCycleState != nil {
+		status = *r.ko.Status.LifeCycleState
 	}
-	status := *r.ko.Status.LifeCycleState
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("accesspoint in '%s' state, requeuing until accesspoint is '%s'",
 			status, svcapitypes.LifeCycleState_available),

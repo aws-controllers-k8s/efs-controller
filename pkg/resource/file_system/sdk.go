@@ -67,6 +67,11 @@ func (rm *resourceManager) sdkFind(
 		msg := fmt.Errorf("field Backup is a NO-OP field. Set BackupPolicy.Status instead")
 		return nil, ackerr.NewTerminalError(msg)
 	}
+	if r.ko.Status.FileSystemID == nil {
+		if r, err = rm.withFileSystemIDFromToken(ctx, r); err != nil {
+			return nil, err
+		}
+	}
 	// If any required fields in the input shape are missing, AWS resource is
 	// not created yet. Return NotFound here to indicate to callers that the
 	// resource isn't yet created.
@@ -264,11 +269,16 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.CreationToken = aws.String(getIdempotencyToken())
+	input.CreationToken = getIdempotencyToken(desired)
 
 	var resp *svcsdk.CreateFileSystemOutput
 	_ = resp
 	resp, err = rm.sdkapi.CreateFileSystem(ctx, input)
+	if existing := fileSystemAlreadyCreated(desired, err); existing != nil {
+		rm.metrics.RecordAPICall("CREATE", "CreateFileSystem", err)
+		rlog.Info("file system already created for this resource, using it", "id", *existing.ko.Status.FileSystemID)
+		return existing, nil
+	}
 	rm.metrics.RecordAPICall("CREATE", "CreateFileSystem", err)
 	if err != nil {
 		return nil, err

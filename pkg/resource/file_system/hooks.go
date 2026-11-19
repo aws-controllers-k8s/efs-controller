@@ -15,6 +15,7 @@ package file_system
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -32,19 +33,96 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-// getIdempotencyToken returns a unique string to be used in certain API calls
-// to ensure no replay of the call.
-func getIdempotencyToken() string {
-	return fmt.Sprintf("%d", time.Now().UTC().Nanosecond())
+// getIdempotencyToken returns the CreationToken for the file system of r.
+//
+// The token is the UID of the CR, so that every Create for the CR sends the
+// same one. When the controller loses the response of a Create that went
+// through, for example because it was restarted before the file system ID
+// reached the status, the next read finds the file system by the token (see
+// withFileSystemIDFromToken), and a Create that runs anyway gets
+// FileSystemAlreadyExists with its ID (see fileSystemAlreadyCreated) instead of
+// creating a second file system.
+//
+// EFS frees the token once the file system is deleted, so the Create that
+// replaces a file system deleted outside of the controller makes a new one.
+//
+// An object without a UID, such as one built by hand in a test, gets nil, and
+// the SDK fills in a random token of its own.
+func getIdempotencyToken(r *resource) *string {
+	if r.ko.UID == "" {
+		return nil
+	}
+	return aws.String(string(r.ko.UID))
+}
+
+// fileSystemAlreadyCreated returns desired with the ID of its file system in
+// the status when err is the FileSystemAlreadyExists error, and nil for any
+// other error.
+//
+// CreateFileSystem returns that error for a creation token it has already
+// seen. The token comes from getIdempotencyToken, so the file system was
+// created for this CR, by an earlier Create whose response was lost. The
+// returned resource carries only the ID; the reconciler reads the rest of the
+// file system right after Create.
+func fileSystemAlreadyCreated(desired *resource, err error) *resource {
+	var exists *svcsdktypes.FileSystemAlreadyExists
+	if !errors.As(err, &exists) || exists.FileSystemId == nil {
+		return nil
+	}
+	ko := desired.ko.DeepCopy()
+	ko.Status.FileSystemID = exists.FileSystemId
+	return &resource{ko}
+}
+
+// withFileSystemIDFromToken returns r with the ID of its file system in the
+// status, when the status has no ID and a file system carries the creation
+// token of r. Otherwise it returns r unchanged.
+//
+// The status has no ID when the controller lost the response of a Create that
+// went through, for example because it was restarted before the ID reached the
+// status. Without the ID, the read would return NotFound: a Create would get
+// FileSystemAlreadyExists (see fileSystemAlreadyCreated), but a CR deleted
+// meanwhile would lose its finalizer and leave the file system behind.
+func (rm *resourceManager) withFileSystemIDFromToken(
+	ctx context.Context,
+	r *resource,
+) (*resource, error) {
+	token := getIdempotencyToken(r)
+	if token == nil {
+		return r, nil
+	}
+	resp, err := rm.sdkapi.DescribeFileSystems(ctx, &svcsdk.DescribeFileSystemsInput{
+		CreationToken: token,
+	})
+	rm.metrics.RecordAPICall("READ_MANY", "DescribeFileSystems", err)
+	if err != nil {
+		var notFound *svcsdktypes.FileSystemNotFound
+		if errors.As(err, &notFound) {
+			return r, nil
+		}
+		return nil, err
+	}
+	for _, fs := range resp.FileSystems {
+		if fs.FileSystemId != nil {
+			ko := r.ko.DeepCopy()
+			ko.Status.FileSystemID = fs.FileSystemId
+			return &resource{ko}, nil
+		}
+	}
+	return r, nil
 }
 
 // requeueWaitState returns a `ackrequeue.RequeueNeededAfter` struct
 // explaining the filesystem cannot be modified until it reaches an active status.
+//
+// It never returns nil. Callers return it as an error, and an error that
+// holds a nil *RequeueNeededAfter is not nil but asks for a requeue after 0s,
+// that is, for none.
 func requeueWaitState(r *resource) *ackrequeue.RequeueNeededAfter {
-	if r.ko.Status.LifeCycleState == nil {
-		return nil
+	status := "unknown"
+	if r.ko.Status.LifeCycleState != nil {
+		status = *r.ko.Status.LifeCycleState
 	}
-	status := *r.ko.Status.LifeCycleState
 	return ackrequeue.NeededAfter(
 		fmt.Errorf("filesystem in '%s' state, requeuing until filesystem is '%s'",
 			status, svcapitypes.LifeCycleState_available),

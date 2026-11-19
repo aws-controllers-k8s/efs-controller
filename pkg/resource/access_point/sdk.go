@@ -63,6 +63,11 @@ func (rm *resourceManager) sdkFind(
 	defer func() {
 		exit(err)
 	}()
+	if r.ko.Status.AccessPointID == nil {
+		if r, err = rm.withAccessPointIDFromToken(ctx, r); err != nil {
+			return nil, err
+		}
+	}
 	// If any required fields in the input shape are missing, AWS resource is
 	// not created yet. Return NotFound here to indicate to callers that the
 	// resource isn't yet created.
@@ -186,7 +191,7 @@ func (rm *resourceManager) sdkFind(
 
 	rm.setStatusDefaults(ko)
 	if !accessPointActive(&resource{ko}) {
-		return &resource{ko}, requeueWaitState(r)
+		return &resource{ko}, requeueWaitState(&resource{ko})
 	}
 
 	return &resource{ko}, nil
@@ -236,11 +241,16 @@ func (rm *resourceManager) sdkCreate(
 		return nil, err
 	}
 	// This is an idempotency token required in the API call...
-	input.ClientToken = aws.String(getIdempotencyToken())
+	input.ClientToken = getIdempotencyToken(desired)
 
 	var resp *svcsdk.CreateAccessPointOutput
 	_ = resp
 	resp, err = rm.sdkapi.CreateAccessPoint(ctx, input)
+	if existing := accessPointAlreadyCreated(desired, err); existing != nil {
+		rm.metrics.RecordAPICall("CREATE", "CreateAccessPoint", err)
+		rlog.Info("access point already created for this resource, using it", "id", *existing.ko.Status.AccessPointID)
+		return existing, nil
+	}
 	rm.metrics.RecordAPICall("CREATE", "CreateAccessPoint", err)
 	if err != nil {
 		return nil, err
